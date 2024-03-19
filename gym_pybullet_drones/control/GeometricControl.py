@@ -118,7 +118,7 @@ class GeometricControl(BaseControl):
 
         """
         self.control_counter += 1
-        thrust, computed_target_rpy, pos_e = self._dslPIDPositionControl(drone_m,
+        thrust, computed_target_rpy, pos_e = self._dslGeoPositionControl(drone_m,
                                                                          cur_pos,
                                                                          cur_quat,
                                                                          cur_vel,
@@ -127,7 +127,7 @@ class GeometricControl(BaseControl):
                                                                          target_vel,
                                                                          target_acc
                                                                          )
-        rpm = self._dslPIDAttitudeControl(drone_J,
+        rpm = self._dslGeoAttitudeControl(drone_J,
                                           thrust,
                                           cur_quat,
                                           cur_angular_vel,
@@ -140,7 +140,7 @@ class GeometricControl(BaseControl):
     
     ################################################################################
 
-    def _dslPIDPositionControl(self,
+    def _dslGeoPositionControl(self,
                                drone_m,
                                cur_pos,
                                cur_quat,
@@ -201,7 +201,7 @@ class GeometricControl(BaseControl):
     
     ################################################################################
 
-    def _dslPIDAttitudeControl(self,
+    def _dslGeoAttitudeControl(self,
                                drone_J,
                                thrust,
                                cur_quat,
