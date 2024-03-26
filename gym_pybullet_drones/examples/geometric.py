@@ -1,13 +1,13 @@
 """Script demonstrating the joint use of simulation and control.
 
 The simulation is run by a `CtrlAviary` environment.
-The control is given by the PID implementation in `DSLPIDControl`.
+The control is given by the geometric controller implementation in `GeometricControl`.
 
 Example
 -------
 In a terminal, run as:
 
-    $ python pid.py
+    $ python geometric.py
 
 Notes
 -----
@@ -27,7 +27,7 @@ import pybullet as p
 import matplotlib.pyplot as plt
 
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
-from gym_pybullet_drones.envs.HoverAviary import HoverAviary
+from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
 from gym_pybullet_drones.control.GeometricControl import GeometricControl
 from gym_pybullet_drones.utils.Logger import Logger
 from gym_pybullet_drones.utils.utils import sync, str2bool
@@ -38,11 +38,11 @@ DEFAULT_PHYSICS = Physics("pyb")
 DEFAULT_GUI = True
 DEFAULT_RECORD_VISION = False
 DEFAULT_PLOT = True
-DEFAULT_USER_DEBUG_GUI = False
+DEFAULT_USER_DEBUG_GUI = True
 DEFAULT_OBSTACLES = False
-DEFAULT_SIMULATION_FREQ_HZ = 240
-DEFAULT_CONTROL_FREQ_HZ = 60
-DEFAULT_DURATION_SEC = 12
+DEFAULT_SIMULATION_FREQ_HZ = 120
+DEFAULT_CONTROL_FREQ_HZ = 120
+DEFAULT_DURATION_SEC = 4
 DEFAULT_OUTPUT_FOLDER = 'results'
 DEFAULT_COLAB = False
 
@@ -65,7 +65,8 @@ def run(
     H = .1
     H_STEP = .05
     R = .3
-    INIT_XYZS = np.array([[R*np.cos((i/6)*2*np.pi+np.pi/2), R*np.sin((i/6)*2*np.pi+np.pi/2)-R, H+i*H_STEP] for i in range(num_drones)])
+    INIT_XYZS = np.array([[1,0,0] for i in range(num_drones)])
+    #INIT_RPYS = np.zeros(3)
     INIT_RPYS = np.array([[0, 0,  i * (np.pi/2)/num_drones] for i in range(num_drones)])
 
     #### Hovering Trajectory ###################################
@@ -101,14 +102,18 @@ def run(
     # wp_counters = np.array([0 for i in range(num_drones)])
 
     #### Create the environment ################################
-    env = HoverAviary(drone_model=drone,
+    env = CtrlAviary(drone_model=drone,
+                        num_drones=num_drones,
                         initial_xyzs=INIT_XYZS,
                         initial_rpys=INIT_RPYS,
                         physics=physics,
+                        neighbourhood_radius=10,
                         pyb_freq=simulation_freq_hz,
                         ctrl_freq=control_freq_hz,
                         gui=gui,
                         record=record_video,
+                        obstacles=obstacles,
+                        user_debug_gui=user_debug_gui
                         )
 
     #### Obtain the PyBullet Client ID from the environment ####
@@ -132,23 +137,29 @@ def run(
 
         #### Make it rain rubber ducks #############################
         # if i/env.SIM_FREQ>5 and i%10==0 and i/env.SIM_FREQ<10: p.loadURDF("duck_vhacd.urdf", [0+random.gauss(0, 0.3),-0.5+random.gauss(0, 0.3),3], p.getQuaternionFromEuler([random.randint(0,360),random.randint(0,360),random.randint(0,360)]), physicsClientId=PYB_CLIENT)
-
+        
         #### Step the simulation ###################################
         obs, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
         for j in range(num_drones):
-            obs_action = env._getDroneStateVector(j)
-            action[j, :], _, _ = ctrl[j].computeControl(env.M,
-                                                        env.J,
+            obs_action = obs[j]
+            action[j, :], _ = ctrl[j].computeControl(drone_m = env.M,
+                                                        drone_J = env.J,
                                                         cur_pos=obs_action[0:3],
                                                         cur_quat=obs_action[3:7],
                                                         cur_vel=obs_action[10:13],
                                                         cur_angular_vel=obs_action[13:16],
                                                         target_pos=TARGET_POS,
                                                         # target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :],
-                                                        target_rpy=np.zeros(3)
+                                                        target_rpy=np.zeros(3),
+                                                        target_vel=np.zeros(3),
+                                                        target_acc=np.zeros(3),
+                                                        target_angular_vel=np.zeros(3),
+                                                        target_angular_acc=np.zeros(3)
                                                         )
+            
+            
 
         #### Go to the next way point and loop #####################
         # for j in range(num_drones):
@@ -159,7 +170,7 @@ def run(
             logger.log(drone=j,
                        timestamp=i/env.CTRL_FREQ,
                        state=obs[j],
-                       control=np.hstack([TARGET_POS[0:2], INIT_XYZS[j, 2], INIT_RPYS[j, :], np.zeros(6)])
+                       control=np.hstack([TARGET_POS[0:3], INIT_RPYS[j, :], np.zeros(6)])
                        # control=np.hstack([INIT_XYZS[j, :]+TARGET_POS[wp_counters[j], :], INIT_RPYS[j, :], np.zeros(6)])
                        )
 
@@ -183,7 +194,7 @@ def run(
 
 if __name__ == "__main__":
     #### Define and parse (optional) arguments for the script ##
-    parser = argparse.ArgumentParser(description='Helix flight script using CtrlAviary and DSLPIDControl')
+    parser = argparse.ArgumentParser(description='Helix flight script using CtrlAviary and GeometricControl')
     parser.add_argument('--drone',              default=DEFAULT_DRONES,     type=DroneModel,    help='Drone model (default: CF2X)', metavar='', choices=DroneModel)
     parser.add_argument('--num_drones',         default=DEFAULT_NUM_DRONES,          type=int,           help='Number of drones (default: 3)', metavar='')
     parser.add_argument('--physics',            default=DEFAULT_PHYSICS,      type=Physics,       help='Physics updates (default: PYB)', metavar='', choices=Physics)

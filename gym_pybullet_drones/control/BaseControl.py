@@ -38,6 +38,7 @@ class BaseControl(object):
         """float: The coefficient converting RPMs into thrust."""
         self.KM = self._getURDFParameter('km')
         """float: The coefficient converting RPMs into torque."""
+        self.L = self._getURDFParameter('arm')
         self.reset()
 
     ################################################################################
