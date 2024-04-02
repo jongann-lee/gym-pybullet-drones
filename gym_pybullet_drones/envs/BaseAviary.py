@@ -13,6 +13,7 @@ import pybullet as p
 import pybullet_data
 import gymnasium as gym
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ImageType
+#from gym_pybullet_drones.control.GeometricControl import GeometricControl
 
 
 class BaseAviary(gym.Env):

@@ -13,7 +13,7 @@ class HoverAviary(BaseRLAviary):
                  initial_xyzs=None,
                  initial_rpys=None,
                  physics: Physics=Physics.PYB,
-                 pyb_freq: int = 240,
+                 pyb_freq: int = 120,
                  ctrl_freq: int = 30,
                  gui=False,
                  record=False,

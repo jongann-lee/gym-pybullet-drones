@@ -7,6 +7,7 @@ from collections import deque
 from gym_pybullet_drones.envs.BaseAviary import BaseAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType, ImageType
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
+from gym_pybullet_drones.control.GeometricControl import GeometricControl
 
 class BaseRLAviary(BaseAviary):
     """Base single and multi-agent environment class for reinforcement learning."""
@@ -65,6 +66,13 @@ class BaseRLAviary(BaseAviary):
         #### Create a buffer for the last .5 sec of actions ########
         self.ACTION_BUFFER_SIZE = int(ctrl_freq//2)
         self.action_buffer = deque(maxlen=self.ACTION_BUFFER_SIZE)
+        self.STATE_BUFFER_SIZE = pyb_freq
+        #### Create a buffer for the last 1 second of observations ####
+        self.OBSERVATION_BUFFER_SIZE = int(ctrl_freq)
+        self.observation_buffer = deque(maxlen = self.OBSERVATION_BUFFER_SIZE)
+        for _ in range(self.OBSERVATION_BUFFER_SIZE):
+            self.observation_buffer.append(np.zeros(12))
+
         ####
         vision_attributes = True if obs == ObservationType.RGB else False
         self.OBS_TYPE = obs
@@ -76,6 +84,13 @@ class BaseRLAviary(BaseAviary):
                 self.ctrl = [DSLPIDControl(drone_model=DroneModel.CF2X) for i in range(num_drones)]
             else:
                 print("[ERROR] in BaseRLAviary.__init()__, no controller is available for the specified drone_model")
+        elif act in [ActionType.GEO]:
+            os.environ['KMP_DUPLICATE_LIB_OK']='True'
+            if drone_model in [DroneModel.CF2X, DroneModel.CF2P]:
+                self.ctrl = [GeometricControl(drone_model=DroneModel.CF2X) for i in range(num_drones)]
+            else:
+                print("[ERROR] in BaseRLAviary.__init()__, no controller is available for the specified drone_model")
+
         super().__init__(drone_model=drone_model,
                          num_drones=num_drones,
                          neighbourhood_radius=neighbourhood_radius,
@@ -138,7 +153,7 @@ class BaseRLAviary(BaseAviary):
             A Box of size NUM_DRONES x 4, 3, or 1, depending on the action type.
 
         """
-        if self.ACT_TYPE in [ActionType.RPM, ActionType.VEL]:
+        if self.ACT_TYPE in [ActionType.RPM, ActionType.VEL, ActionType.GEO]:
             size = 4
         elif self.ACT_TYPE==ActionType.PID:
             size = 3
@@ -147,8 +162,13 @@ class BaseRLAviary(BaseAviary):
         else:
             print("[ERROR] in BaseRLAviary._actionSpace()")
             exit()
-        act_lower_bound = np.array([-1*np.ones(size) for i in range(self.NUM_DRONES)])
-        act_upper_bound = np.array([+1*np.ones(size) for i in range(self.NUM_DRONES)])
+
+        if self.ACT_TYPE != ActionType.GEO:
+            act_lower_bound = np.array([-1*np.ones(size) for i in range(self.NUM_DRONES)])
+            act_upper_bound = np.array([+1*np.ones(size) for i in range(self.NUM_DRONES)])
+        else:
+            act_lower_bound = np.array([0.9*np.ones(size) for i in range(self.NUM_DRONES)])
+            act_upper_bound = np.array([1.1*np.ones(size) for i in range(self.NUM_DRONES)])
         #
         for i in range(self.ACTION_BUFFER_SIZE):
             self.action_buffer.append(np.zeros((self.NUM_DRONES,size)))
@@ -205,6 +225,26 @@ class BaseRLAviary(BaseAviary):
                                                         target_pos=next_pos
                                                         )
                 rpm[k,:] = rpm_k
+            elif self.ACT_TYPE == ActionType.GEO:
+                self.ctrl[k].k_x *= action[k,0]
+                self.ctrl[k].k_v *= action[k,1]
+                self.ctrl[k].k_R *= action[k,2]
+                self.ctrl[k].k_omega *= action[k,3]
+                state = self._getDroneStateVector(k)
+                rpm_k, _ = self.ctrl[k].computeControl(drone_m = self.M,
+                                                        drone_J = self.J,
+                                                        cur_pos=state[0:3],
+                                                        cur_quat=state[3:7],
+                                                        cur_vel=state[10:13],
+                                                        cur_angular_vel=state[13:16],
+                                                        target_pos=np.array([0, 0, 1]),
+                                                        target_rpy=np.zeros(3),
+                                                        target_vel=np.zeros(3),
+                                                        target_acc=np.zeros(3),
+                                                        target_angular_vel=np.zeros(3),
+                                                        target_angular_acc=np.zeros(3)
+                                                        )
+                rpm[k,:] = rpm_k
             elif self.ACT_TYPE == ActionType.VEL:
                 state = self._getDroneStateVector(k)
                 if np.linalg.norm(target[0:3]) != 0:
@@ -253,7 +293,7 @@ class BaseRLAviary(BaseAviary):
             return spaces.Box(low=0,
                               high=255,
                               shape=(self.NUM_DRONES, self.IMG_RES[1], self.IMG_RES[0], 4), dtype=np.uint8)
-        elif self.OBS_TYPE == ObservationType.KIN:
+        elif self.OBS_TYPE == ObservationType.KIN and self.ACT_TYPE != ActionType.GEO:
             ############################################################
             #### OBS SPACE OF SIZE 12
             #### Observation vector ### X        Y        Z       Q1   Q2   Q3   Q4   R       P       Y       VX       VY       VZ       WX       WY       WZ
@@ -276,6 +316,14 @@ class BaseRLAviary(BaseAviary):
                     obs_upper_bound = np.hstack([obs_upper_bound, np.array([[act_hi] for i in range(self.NUM_DRONES)])])
             return spaces.Box(low=obs_lower_bound, high=obs_upper_bound, dtype=np.float32)
             ############################################################
+        elif self.OBS_TYPE == ObservationType.KIN and self.ACT_TYPE == ActionType.GEO:
+            """ Observation space of 4 variables: e_x, e_v, e_R, e_Omega
+            """
+            lo = -np.inf
+            hi = np.inf
+            obs_lower_bound = np.array([[lo,lo,lo,lo,lo,lo,lo,lo,lo,lo,lo,lo] for i in range(self.OBSERVATION_BUFFER_SIZE)])
+            obs_upper_bound = np.array([[hi,hi,hi,hi,hi,hi,hi,hi,hi,hi,hi,hi] for i in range(self.OBSERVATION_BUFFER_SIZE)])
+            return spaces.Box(low=obs_lower_bound, high=obs_upper_bound, dtype=np.float32)
         else:
             print("[ERROR] in BaseRLAviary._observationSpace()")
     
@@ -304,7 +352,7 @@ class BaseRLAviary(BaseAviary):
                                           frame_num=int(self.step_counter/self.IMG_CAPTURE_FREQ)
                                           )
             return np.array([self.rgb[i] for i in range(self.NUM_DRONES)]).astype('float32')
-        elif self.OBS_TYPE == ObservationType.KIN:
+        elif self.OBS_TYPE == ObservationType.KIN and self.ACT_TYPE != ActionType.GEO:
             ############################################################
             #### OBS SPACE OF SIZE 12
             obs_12 = np.zeros((self.NUM_DRONES,12))
@@ -318,5 +366,30 @@ class BaseRLAviary(BaseAviary):
                 ret = np.hstack([ret, np.array([self.action_buffer[i][j, :] for j in range(self.NUM_DRONES)])])
             return ret
             ############################################################
+        
+        elif self.OBS_TYPE == ObservationType.KIN and self.ACT_TYPE == ActionType.GEO:
+            ### get the horizontal errors
+            obs = self._getDroneStateVector(0)
+            cur_pos = obs[0:3]
+            cur_vel = obs[10:13]
+            target_pos = np.array([0, 0, 1])
+            target_vel = np.array([0, 0, 0])
+            e_x = cur_pos - target_pos
+            e_v = cur_vel - target_vel
+            ### attitude error
+            cur_quat = obs[3:7]
+            cur_ang_v = obs[13:16] # in the world frame
+            cur_rotation = np.array(p.getMatrixFromQuaternion(cur_quat)).reshape(3, 3)
+            cur_angular_vel = cur_rotation.transpose() @ cur_ang_v # angular velocity now in body frame
+            target_rotation = np.identity(3)
+            target_angular_vel = np.zeros(3)
+            rot_matrix_e = (target_rotation.transpose())@cur_rotation - (cur_rotation.transpose())@target_rotation
+            rot_e = 0.5 * np.array([rot_matrix_e[2, 1], rot_matrix_e[0, 2], rot_matrix_e[1, 0]])
+            omega_e = cur_angular_vel - cur_rotation.transpose()@target_rotation@target_angular_vel
+            ### Add the observation to the observation queue
+            current_error = np.hstack([e_x, e_v, rot_e, omega_e])
+            self.observation_buffer.append(current_error)
+            return np.asarray(self.observation_buffer)
+
         else:
             print("[ERROR] in BaseRLAviary._computeObs()")

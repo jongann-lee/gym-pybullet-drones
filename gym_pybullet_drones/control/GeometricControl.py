@@ -32,10 +32,10 @@ class GeometricControl(BaseControl):
         if self.DRONE_MODEL != DroneModel.CF2X and self.DRONE_MODEL != DroneModel.CF2P:
             print("[ERROR] in GeometricControl.__init__(), GeometricControl requires DroneModel.CF2X or DroneModel.CF2P")
             exit()
-        self.k_x = 0.03
-        self.k_v = 0.04
-        self.k_R = 0.0005
-        self.k_omega = 0.0001
+        self.k_x = 5 * 0.01
+        self.k_v = 1 * 0.01
+        self.k_R = 5 * 0.0001
+        self.k_omega = 1 * 0.0001
         self.PWM2RPM_SCALE = 0.2685
         self.PWM2RPM_CONST = 4070.3
         self.MIN_PWM = 0
@@ -149,7 +149,6 @@ class GeometricControl(BaseControl):
                                           target_angular_acc
                                           )
         cur_rpy = p.getEulerFromQuaternion(cur_quat)
-        #print(pos_e)
         return rpm, pos_e
     
     ################################################################################
@@ -208,7 +207,6 @@ class GeometricControl(BaseControl):
         target_x_ax = np.cross(target_y_ax, target_z_ax)
         target_rotation = (np.vstack([target_x_ax, target_y_ax, target_z_ax])).transpose()
         target_rpy = (Rotation.from_matrix(target_rotation)).as_euler('XYZ', degrees=False)
-        #print(target_rpy)
         return scalar_thrust, target_rotation, pos_e
     
     ################################################################################
@@ -269,13 +267,10 @@ class GeometricControl(BaseControl):
         target_torques =  - self.k_R*rot_e - self.k_omega*omega_e + np.cross(cur_angular_vel, drone_J@cur_angular_vel) \
                        - drone_J @ (cur_angular_vel_hat@cur_rotation.transpose()@target_rotation@target_angular_vel - cur_rotation.transpose()@target_rotation@target_angular_acc)
         target_torques = np.clip(target_torques, -3200, 3200)
-        print(target_torques)
         force_wrench = np.hstack([thrust, target_torques])
         force_component = self.inv_mixer @ force_wrench
         force_component = np.maximum(np.zeros(4), force_component)
-        #print(force_component)
         rpm = (np.sqrt(force_component / self.KF)) 
-        #print(rpm)
         return rpm
     
     
