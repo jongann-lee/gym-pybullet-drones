@@ -28,10 +28,11 @@ from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewar
 from stable_baselines3.common.evaluation import evaluate_policy
 
 from gym_pybullet_drones.utils.Logger import Logger
-from gym_pybullet_drones.envs.HoverAviary import HoverAviary
+from gym_pybullet_drones.envs.GeoHoverAviary import GeoHoverAviary
 from gym_pybullet_drones.envs.MultiHoverAviary import MultiHoverAviary
 from gym_pybullet_drones.utils.utils import sync, str2bool
-from gym_pybullet_drones.utils.enums import ObservationType, ActionType
+from gym_pybullet_drones.utils.enums import ObservationType, ActionType, DroneModel
+from gym_pybullet_drones.control.GeometricControl import GeometricControl
 
 DEFAULT_GUI = True
 DEFAULT_RECORD_VIDEO = False
@@ -40,6 +41,7 @@ DEFAULT_COLAB = False
 
 DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
 DEFAULT_ACT = ActionType('geo') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
+DEFAULT_DRONEMODEL = DroneModel("cf2x")
 DEFAULT_MA = False
 
 def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=DEFAULT_COLAB, record_video=DEFAULT_RECORD_VIDEO, local=True):
@@ -48,12 +50,12 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     if not os.path.exists(filename):
         os.makedirs(filename+'/')
 
-    train_env = make_vec_env(HoverAviary,
+    train_env = make_vec_env(GeoHoverAviary,
                              env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT),
                              n_envs=1,
                              seed=0
                              )
-    eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+    eval_env = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
 
     #### Check the environment's spaces ########################
     print('[INFO] Action space:', train_env.action_space)
@@ -81,7 +83,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                                  eval_freq=int(1000),
                                  deterministic=True,
                                  render=False)
-    model.learn(total_timesteps=int(1e5) if local else int(1e2), # shorter training in GitHub Actions pytest
+    model.learn(total_timesteps=int(1e4) if local else int(1e2), # shorter training in GitHub Actions pytest
                 callback=eval_callback,
                 log_interval=100)
 
@@ -113,11 +115,11 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     model = PPO.load(path)
 
     #### Show (and record a video of) the model's performance ##
-    test_env = HoverAviary(gui=gui,
+    test_env = GeoHoverAviary(gui=gui,
                             obs=DEFAULT_OBS,
                             act=DEFAULT_ACT,
                             record=record_video)
-    test_env_nogui = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+    test_env_nogui = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
 
     logger = Logger(logging_freq_hz=int(test_env.CTRL_FREQ),
                 num_drones=1,
@@ -133,12 +135,33 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
 
     obs, info = test_env.reset(seed=42, options={})
     start = time.time()
+    ctrl = GeometricControl(drone_model = DEFAULT_DRONEMODEL)
+
     for i in range((test_env.EPISODE_LEN_SEC+2)*test_env.CTRL_FREQ):
         action, _states = model.predict(obs,
                                         deterministic=True
                                         )
+        # ctrl.k_x *= action[0,0]
+        # ctrl.k_v *= action[0,1]
+        # ctrl.k_R *= action[0,2]
+        # ctrl.k_omega *= action[0,3]
+        # state = test_env._getDroneStateVector(0)
+        # rpm, _ = ctrl.computeControl(drone_m = test_env.M,
+        #                                 drone_J = test_env.J,
+        #                                 cur_pos=state[0:3],
+        #                                 cur_quat=state[3:7],
+        #                                 cur_vel=state[10:13],
+        #                                 cur_angular_vel=state[13:16],
+        #                                 target_pos=np.array([0, 0, 1]),
+        #                                 target_rpy=np.zeros(3),
+        #                                 target_vel=np.zeros(3),
+        #                                 target_acc=np.zeros(3),
+        #                                 target_angular_vel=np.zeros(3),
+        #                                 target_angular_acc=np.zeros(3)
+        #                                 )
         obs, reward, terminated, truncated, info = test_env.step(action)
-        obs2 = obs.squeeze()
+        obs2 = test_env._getDroneStateVector(0)
+        obs2 = obs2.squeeze()
         act2 = action.squeeze()
         print("Obs:", obs, "\tAction", action, "\tReward:", reward, "\tTerminated:", terminated, "\tTruncated:", truncated)
         if DEFAULT_OBS == ObservationType.KIN:
