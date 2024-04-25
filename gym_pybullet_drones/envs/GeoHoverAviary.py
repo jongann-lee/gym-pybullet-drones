@@ -13,7 +13,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
                  initial_xyzs=None,
                  initial_rpys=None,
                  physics: Physics=Physics.PYB,
-                 pyb_freq: int = 120,
+                 pyb_freq: int = 60,
                  update_freq: int = 1,
                  gui=False,
                  record=False,

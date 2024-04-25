@@ -67,11 +67,15 @@ class BaseGeoRLAviary(BaseAviary):
         self.INPUT_BUFFER_SIZE = int(pyb_freq//2)
         self.input_buffer = deque(maxlen=self.INPUT_BUFFER_SIZE)
         self.STATE_BUFFER_SIZE = pyb_freq
-        #### Create a buffer for the last 1 second of observations ####
+        #### Create a buffer for the last 1 second of observations and errors ####
         self.OBSERVATION_BUFFER_SIZE = int(pyb_freq)
         self.observation_buffer = deque(maxlen = self.OBSERVATION_BUFFER_SIZE)
         for _ in range(self.OBSERVATION_BUFFER_SIZE):
-            self.observation_buffer.append(np.zeros(12))
+            self.observation_buffer.append(np.zeros(20))
+        self.ERROR_BUFFER_SIZE = int(pyb_freq)
+        self.error_buffer = deque(maxlen = self.ERROR_BUFFER_SIZE)
+        for _ in range(self.ERROR_BUFFER_SIZE):
+            self.error_buffer.append(np.zeros(12))
         
         ####
         vision_attributes = True if obs == ObservationType.RGB else False
@@ -207,6 +211,8 @@ class BaseGeoRLAviary(BaseAviary):
             #### Between aggregate steps for certain types of update ###
             if self.PYB_STEPS_PER_CTRL > 1 and self.PHYSICS in [Physics.DYN, Physics.PYB_GND, Physics.PYB_DRAG, Physics.PYB_DW, Physics.PYB_GND_DRAG_DW]:
                 self._updateAndStoreKinematicInformation()
+            #### Update the clipped action every iteration so that the controller runs correctly in the background
+            clipped_action = np.reshape(self._preprocessAction(np.ones((1,4))), (self.NUM_DRONES, 4))
             #### Step the simulation using the desired physics update ##
             for i in range (self.NUM_DRONES):
                 if self.PHYSICS == Physics.PYB:
@@ -227,13 +233,37 @@ class BaseGeoRLAviary(BaseAviary):
                     self._groundEffect(clipped_action[i, :], i)
                     self._drag(self.last_clipped_action[i, :], i)
                     self._downwash(i)
+                ### Create a buffer of the observation and errors
+                obs = self._getDroneStateVector(0)
+                self.observation_buffer.append(obs)
+                ### get the horizontal errors
+                cur_pos = obs[0:3]
+                cur_vel = obs[10:13]
+                target_pos = np.array([0, 0, 1])
+                target_vel = np.array([0, 0, 0])
+                e_x = cur_pos - target_pos
+                e_v = cur_vel - target_vel
+                ### attitude error
+                cur_quat = obs[3:7]
+                cur_ang_v = obs[13:16] # in the world frame
+                cur_rotation = np.array(p.getMatrixFromQuaternion(cur_quat)).reshape(3, 3)
+                cur_angular_vel = cur_rotation.transpose() @ cur_ang_v # angular velocity now in body frame
+                target_rotation = np.identity(3)
+                target_angular_vel = np.zeros(3)
+                rot_matrix_e = (target_rotation.transpose())@cur_rotation - (cur_rotation.transpose())@target_rotation
+                rot_e = 0.5 * np.array([rot_matrix_e[2, 1], rot_matrix_e[0, 2], rot_matrix_e[1, 0]])
+                omega_e = cur_angular_vel - cur_rotation.transpose()@target_rotation@target_angular_vel
+                ### Add the observation to the observation queue
+                current_error = np.hstack([e_x, e_v, rot_e, omega_e])
+                self.error_buffer.append(current_error)
+
             #### PyBullet computes the new state, unless Physics.DYN ###
             if self.PHYSICS != Physics.DYN:
                 p.stepSimulation(physicsClientId=self.CLIENT)
             #### Save the last applied action (e.g. to compute drag) ###
             self.last_clipped_action = clipped_action
-        #### Update and store the drones kinematic information #####
-        self._updateAndStoreKinematicInformation()
+            #### Update and store the drones kinematic information #####
+            self._updateAndStoreKinematicInformation()
         #### Prepare the return values #############################
         obs = self._computeObs()
         reward = self._computeReward()
@@ -470,28 +500,8 @@ class BaseGeoRLAviary(BaseAviary):
             ############################################################
         
         elif self.OBS_TYPE == ObservationType.KIN and self.ACT_TYPE == ActionType.GEO:
-            ### get the horizontal errors
-            obs = self._getDroneStateVector(0)
-            cur_pos = obs[0:3]
-            cur_vel = obs[10:13]
-            target_pos = np.array([0, 0, 1])
-            target_vel = np.array([0, 0, 0])
-            e_x = cur_pos - target_pos
-            e_v = cur_vel - target_vel
-            ### attitude error
-            cur_quat = obs[3:7]
-            cur_ang_v = obs[13:16] # in the world frame
-            cur_rotation = np.array(p.getMatrixFromQuaternion(cur_quat)).reshape(3, 3)
-            cur_angular_vel = cur_rotation.transpose() @ cur_ang_v # angular velocity now in body frame
-            target_rotation = np.identity(3)
-            target_angular_vel = np.zeros(3)
-            rot_matrix_e = (target_rotation.transpose())@cur_rotation - (cur_rotation.transpose())@target_rotation
-            rot_e = 0.5 * np.array([rot_matrix_e[2, 1], rot_matrix_e[0, 2], rot_matrix_e[1, 0]])
-            omega_e = cur_angular_vel - cur_rotation.transpose()@target_rotation@target_angular_vel
-            ### Add the observation to the observation queue
-            current_error = np.hstack([e_x, e_v, rot_e, omega_e])
-            self.observation_buffer.append(current_error)
-            return np.asarray(self.observation_buffer)
+            
+            return np.asarray(self.error_buffer)
 
         else:
             print("[ERROR] in BaseRLAviary._computeObs()")
