@@ -22,7 +22,7 @@ import argparse
 import gymnasium as gym
 import numpy as np
 import torch
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, A2C, DDPG
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -62,8 +62,18 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     print('[INFO] Observation space:', train_env.observation_space)
 
     #### Train the model #######################################
-    model = PPO('MlpPolicy',
+    onpolicy_kwargs = dict(activation_fn=torch.nn.ReLU,
+                           #net_arch=[128, 128]
+                           net_arch=dict(vf=[1024, 256, 256], pi=[1024, 256, 128])
+                           )
+    offpolicy_kwargs = dict(activation_fn=torch.nn.ReLU,
+                            net_arch=[1024, 256, 256, 128]
+                            )
+
+    model = DDPG('MlpPolicy',
                 train_env,
+                policy_kwargs= offpolicy_kwargs,
+                #ent_coef = 0.2, 
                 # tensorboard_log=filename+'/tb/',
                 verbose=1)
 
@@ -83,7 +93,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                                  eval_freq=int(1000),
                                  deterministic=True,
                                  render=False)
-    model.learn(total_timesteps=int(1e4) if local else int(1e2), # shorter training in GitHub Actions pytest
+    model.learn(total_timesteps=int(1e6) if local else int(1e2), # shorter training in GitHub Actions pytest
                 callback=eval_callback,
                 log_interval=100)
 
@@ -112,7 +122,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
         path = filename+'/best_model.zip'
     else:
         print("[ERROR]: no model under the specified path", filename)
-    model = PPO.load(path)
+    model = DDPG.load(path)
 
     #### Show (and record a video of) the model's performance ##
     test_env = GeoHoverAviary(gui=gui,
@@ -137,47 +147,31 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     start = time.time()
     ctrl = GeometricControl(drone_model = DEFAULT_DRONEMODEL)
 
-    for i in range((test_env.EPISODE_LEN_SEC+2)*test_env.CTRL_FREQ):
-        action, _states = model.predict(obs,
+    for i in range((test_env.EPISODE_LEN_SEC+2)*test_env.PYB_FREQ):
+        if i % test_env.PYB_STEPS_PER_CTRL == 0:
+            action, _states = model.predict(obs,
                                         deterministic=True
                                         )
-        # ctrl.k_x *= action[0,0]
-        # ctrl.k_v *= action[0,1]
-        # ctrl.k_R *= action[0,2]
-        # ctrl.k_omega *= action[0,3]
-        # state = test_env._getDroneStateVector(0)
-        # rpm, _ = ctrl.computeControl(drone_m = test_env.M,
-        #                                 drone_J = test_env.J,
-        #                                 cur_pos=state[0:3],
-        #                                 cur_quat=state[3:7],
-        #                                 cur_vel=state[10:13],
-        #                                 cur_angular_vel=state[13:16],
-        #                                 target_pos=np.array([0, 0, 1]),
-        #                                 target_rpy=np.zeros(3),
-        #                                 target_vel=np.zeros(3),
-        #                                 target_acc=np.zeros(3),
-        #                                 target_angular_vel=np.zeros(3),
-        #                                 target_angular_acc=np.zeros(3)
-        #                                 )
-        obs, reward, terminated, truncated, info = test_env.step(action)
-        obs2 = test_env._getDroneStateVector(0)
-        obs2 = obs2.squeeze()
-        act2 = action.squeeze()
-        print("Obs:", obs, "\tAction", action, "\tReward:", reward, "\tTerminated:", terminated, "\tTruncated:", truncated)
+            obs, reward, terminated, truncated, info = test_env.step(action)
+            act2 = action.squeeze()
+            print("\tAction", action)
+        
+        obs2 = test_env.observation_buffer[i % test_env.PYB_STEPS_PER_CTRL][:]
+        print("Obs:", obs2)
+        
+        
+        #print("Obs:", obs2, "\tReward:", reward, "\tTerminated:", terminated, "\tTruncated:", truncated)
+        
         if DEFAULT_OBS == ObservationType.KIN:
             logger.log(drone=0,
-                timestamp=i/test_env.CTRL_FREQ,
-                state=np.hstack([obs2[0:3],
-                                    np.zeros(4),
-                                    obs2[3:15],
-                                    act2
-                                    ]),
+                timestamp=i/test_env.PYB_FREQ,
+                state=obs2,
                 control=np.zeros(12)
                 )
 
-        test_env.render()
-        print(terminated)
-        sync(i, start, test_env.CTRL_TIMESTEP)
+        #test_env.render()
+        #print(terminated)
+        sync(i, start, test_env.PYB_TIMESTEP)
         if terminated:
             obs = test_env.reset(seed=42, options={})
     test_env.close()

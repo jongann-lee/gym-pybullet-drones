@@ -9,7 +9,7 @@ import argparse
 import gymnasium as gym
 import numpy as np
 import torch
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, A2C
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -37,7 +37,7 @@ record_video = DEFAULT_RECORD_VIDEO
 colab = DEFAULT_COLAB
 plot = True
 
-filename = os.path.join(output_folder, 'save-04.16.2024_21.51.39')
+filename = os.path.join(output_folder, 'save-04.29.2024_21.47.28')
 
 if os.path.isfile(filename+'/best_model.zip'):
     path = filename+'/best_model.zip'
@@ -52,7 +52,7 @@ test_env = GeoHoverAviary(gui=gui,
                         record=record_video)
 test_env_nogui = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
 
-logger = Logger(logging_freq_hz=int(test_env.CTRL_FREQ),
+logger = Logger(logging_freq_hz=int(test_env.PYB_FREQ),
             num_drones=1,
             output_folder=output_folder,
             colab=colab
@@ -66,19 +66,19 @@ print("\n\n\nMean reward ", mean_reward, " +- ", std_reward, "\n\n")
 
 obs, info = test_env.reset(seed=42, options={})
 start = time.time()
-ctrl = GeometricControl(drone_model = DEFAULT_DRONEMODEL)
 
 for i in range((test_env.EPISODE_LEN_SEC+2)*test_env.PYB_FREQ):
-    if i % test_env.PYB_STEPS_PER_CTRL == 0:
+    if (i % test_env.PYB_STEPS_PER_CTRL) == 0:
         action, _states = model.predict(obs,
                                     deterministic=True
                                     )
         obs, reward, terminated, truncated, info = test_env.step(action)
         act2 = action.squeeze()
         print("\tAction", action)
+        
     
     obs2 = test_env.observation_buffer[i % test_env.PYB_STEPS_PER_CTRL][:]
-    print("Obs:", obs2)
+    #print("Obs:", obs2)
     
     
     #print("Obs:", obs2, "\tReward:", reward, "\tTerminated:", terminated, "\tTruncated:", truncated)

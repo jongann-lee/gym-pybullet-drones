@@ -63,20 +63,21 @@ class BaseGeoRLAviary(BaseAviary):
             The type of action space (1 or 3D; RPMS, thurst and torques, waypoint or velocity with PID control; etc.)
 
         """
-        #### Create a buffer for the last .5 sec of inpus ########
+        #### Create a buffer for the last .5 sec of inputs ########
         self.INPUT_BUFFER_SIZE = int(pyb_freq//2)
         self.input_buffer = deque(maxlen=self.INPUT_BUFFER_SIZE)
         self.STATE_BUFFER_SIZE = pyb_freq
+        
         #### Create a buffer for the last 1 second of observations and errors ####
-        self.OBSERVATION_BUFFER_SIZE = int(pyb_freq)
+        self.OBSERVATION_BUFFER_SIZE = int(pyb_freq / update_freq)
         self.observation_buffer = deque(maxlen = self.OBSERVATION_BUFFER_SIZE)
         for _ in range(self.OBSERVATION_BUFFER_SIZE):
             self.observation_buffer.append(np.zeros(20))
-        self.ERROR_BUFFER_SIZE = int(pyb_freq)
+        self.ERROR_BUFFER_SIZE = int(pyb_freq / update_freq)
         self.error_buffer = deque(maxlen = self.ERROR_BUFFER_SIZE)
         for _ in range(self.ERROR_BUFFER_SIZE):
             self.error_buffer.append(np.zeros(12))
-        
+
         ####
         vision_attributes = True if obs == ObservationType.RGB else False
         self.OBS_TYPE = obs
@@ -109,6 +110,8 @@ class BaseGeoRLAviary(BaseAviary):
                          user_debug_gui=False, # Remove of RPM sliders from all single agent learning aviaries
                          vision_attributes=vision_attributes,
                          )
+        
+
         #### Set a limit on the maximum target speed ###############
         if act == ActionType.VEL:
             self.SPEED_LIMIT = 0.03 * self.MAX_SPEED_KMH * (1000/3600)
@@ -145,7 +148,50 @@ class BaseGeoRLAviary(BaseAviary):
                        )
         else:
             pass
+    
+    ################################################################################
 
+    def reset(self,
+              seed : int = None,
+              options : dict = None):
+        """Resets the environment.
+
+        Parameters
+        ----------
+        seed : int, optional
+            Random seed.
+        options : dict[..], optional
+            Additinonal options, unused
+
+        Returns
+        -------
+        ndarray | dict[..]
+            The initial observation, check the specific implementation of `_computeObs()`
+            in each subclass for its format.
+        dict[..]
+            Additional information as a dictionary, check the specific implementation of `_computeInfo()`
+            in each subclass for its format.
+
+        """
+
+        # TODO : initialize random number generator with seed
+        if self.ACT_TYPE == ActionType.GEO:
+            self.ctrl[0].k_x = 15 * 0.01
+            self.ctrl[0].k_v = 1 * 0.01
+            self.ctrl[0].k_R = 15 * 0.0001
+            self.ctrl[0].k_omega = 1 * 0.0001
+        p.resetSimulation(physicsClientId=self.CLIENT)
+        #### Housekeeping ##########################################
+        self._housekeeping()
+        #### Update and store the drones kinematic information #####
+        self._updateAndStoreKinematicInformation()
+        #### Start video recording #################################
+        self._startVideoRecording()
+        #### Return the initial observation ########################
+        initial_obs = self._computeObs()
+        initial_info = self._computeInfo()
+        return initial_obs, initial_info
+    
     ################################################################################
 
     def step(self,
@@ -205,6 +251,7 @@ class BaseGeoRLAviary(BaseAviary):
         #### Save, preprocess, and clip the action to the max. RPM #
         else:
             clipped_action = np.reshape(self._preprocessAction(action), (self.NUM_DRONES, 4))
+            #print("the four parameters", self.ctrl[0].k_x, self.ctrl[0].k_v, self.ctrl[0].k_R, self.ctrl[0].k_omega)
         #### Repeat for as many as the aggregate physics steps #####
         for _ in range(self.PYB_STEPS_PER_CTRL):
             #### Update and store the drones kinematic info for certain
@@ -212,7 +259,7 @@ class BaseGeoRLAviary(BaseAviary):
             if self.PYB_STEPS_PER_CTRL > 1 and self.PHYSICS in [Physics.DYN, Physics.PYB_GND, Physics.PYB_DRAG, Physics.PYB_DW, Physics.PYB_GND_DRAG_DW]:
                 self._updateAndStoreKinematicInformation()
             #### Update the clipped action every iteration so that the controller runs correctly in the background
-            clipped_action = np.reshape(self._preprocessAction(np.ones((1,4))), (self.NUM_DRONES, 4))
+            clipped_action = np.reshape(self._preprocessAction(np.zeros((1,4))), (self.NUM_DRONES, 4))
             #### Step the simulation using the desired physics update ##
             for i in range (self.NUM_DRONES):
                 if self.PHYSICS == Physics.PYB:
@@ -295,12 +342,9 @@ class BaseGeoRLAviary(BaseAviary):
             print("[ERROR] in BaseRLAviary._actionSpace()")
             exit()
 
-        if self.ACT_TYPE != ActionType.GEO:
-            act_lower_bound = np.array([-1*np.ones(size) for i in range(self.NUM_DRONES)])
-            act_upper_bound = np.array([+1*np.ones(size) for i in range(self.NUM_DRONES)])
-        else: # The relevent actionspace for GeoHover
-            act_lower_bound = np.array([0.9*np.ones(size) for i in range(self.NUM_DRONES)])
-            act_upper_bound = np.array([1.1*np.ones(size) for i in range(self.NUM_DRONES)])
+        
+        act_lower_bound = np.array([-1*np.ones(size) for i in range(self.NUM_DRONES)])
+        act_upper_bound = np.array([+1*np.ones(size) for i in range(self.NUM_DRONES)])
         #
         for i in range(self.INPUT_BUFFER_SIZE):
             self.input_buffer.append(np.zeros((self.NUM_DRONES,size)))
@@ -358,10 +402,12 @@ class BaseGeoRLAviary(BaseAviary):
                                                         )
                 rpm[k,:] = rpm_k
             elif self.ACT_TYPE == ActionType.GEO:
-                self.ctrl[k].k_x *= action[k,0]
-                self.ctrl[k].k_v *= action[k,1]
-                self.ctrl[k].k_R *= action[k,2]
-                self.ctrl[k].k_omega *= action[k,3]
+                self.ctrl[k].k_x *= np.power(10, action[k,0])
+                self.ctrl[k].k_v *= np.power(10, action[k,1])
+                self.ctrl[k].k_R *= np.power(10, action[k,2])
+                self.ctrl[k].k_omega *= np.power(10, action[k,3])
+                #print(action[k])
+                #print("the four parameters", self.ctrl[k].k_x, self.ctrl[k].k_v, self.ctrl[k].k_R, self.ctrl[k].k_omega)
                 state = self._getDroneStateVector(k)
                 rpm_k, _ = self.ctrl[k].computeControl(drone_m = self.M,
                                                         drone_J = self.J,
