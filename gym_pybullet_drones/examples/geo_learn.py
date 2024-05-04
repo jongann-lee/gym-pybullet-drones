@@ -22,7 +22,8 @@ import argparse
 import gymnasium as gym
 import numpy as np
 import torch
-from stable_baselines3 import PPO, A2C, DDPG
+from stable_baselines3 import PPO, A2C, DDPG, TD3
+from stable_baselines3.common.noise import NormalActionNoise
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -64,16 +65,21 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     #### Train the model #######################################
     onpolicy_kwargs = dict(activation_fn=torch.nn.ReLU,
                            #net_arch=[128, 128]
-                           net_arch=dict(vf=[1024, 256, 256], pi=[1024, 256, 128])
+                           net_arch=dict(vf=[256, 256], pi=[256, 128])
                            )
     offpolicy_kwargs = dict(activation_fn=torch.nn.ReLU,
                             net_arch=[1024, 256, 256, 128]
                             )
+    n_actions = train_env.action_space.shape[-1]
+    actionnoise = NormalActionNoise(mean=np.zeros(n_actions), sigma = 0.5*np.ones(n_actions))
 
-    model = DDPG('MlpPolicy',
+    model = PPO('MlpPolicy',
                 train_env,
-                policy_kwargs= offpolicy_kwargs,
-                #ent_coef = 0.2, 
+                policy_kwargs = onpolicy_kwargs,
+                ent_coef = 0.1,
+                clip_range = 0.4, 
+                learning_rate = 0.00001, 
+                #action_noise=actionnoise,
                 # tensorboard_log=filename+'/tb/',
                 verbose=1)
 
@@ -81,7 +87,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     if DEFAULT_ACT == ActionType.ONE_D_RPM:
         target_reward = 474.15 
     else:
-        target_reward = 467. 
+        target_reward = 46700. 
     callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=target_reward,
                                                      verbose=1)
     
@@ -93,7 +99,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                                  eval_freq=int(1000),
                                  deterministic=True,
                                  render=False)
-    model.learn(total_timesteps=int(1e6) if local else int(1e2), # shorter training in GitHub Actions pytest
+    model.learn(total_timesteps=int(3e6) if local else int(1e2), # shorter training in GitHub Actions pytest
                 callback=eval_callback,
                 log_interval=100)
 
@@ -122,7 +128,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
         path = filename+'/best_model.zip'
     else:
         print("[ERROR]: no model under the specified path", filename)
-    model = DDPG.load(path)
+    model = PPO.load(path)
 
     #### Show (and record a video of) the model's performance ##
     test_env = GeoHoverAviary(gui=gui,

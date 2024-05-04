@@ -49,7 +49,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
 
         """
         self.TARGET_POS = np.array([0,0,1])
-        self.EPISODE_LEN_SEC = 6
+        self.EPISODE_LEN_SEC = 8
         super().__init__(drone_model=drone_model,
                          num_drones=1,
                          initial_xyzs=initial_xyzs,
@@ -75,7 +75,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
 
         """
         state = self._getDroneStateVector(0)
-        ret = 10*(1 - np.linalg.norm(self.TARGET_POS-state[0:3])**4)
+        ret = (1 - np.linalg.norm(self.TARGET_POS-state[0:3])**2) - 0.4 * (np.linalg.norm(state[10:13])**2)
         return ret
 
     ################################################################################

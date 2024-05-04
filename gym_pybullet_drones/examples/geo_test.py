@@ -9,7 +9,7 @@ import argparse
 import gymnasium as gym
 import numpy as np
 import torch
-from stable_baselines3 import PPO, A2C
+from stable_baselines3 import PPO, A2C, TD3
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -37,7 +37,7 @@ record_video = DEFAULT_RECORD_VIDEO
 colab = DEFAULT_COLAB
 plot = True
 
-filename = os.path.join(output_folder, 'save-04.29.2024_21.47.28')
+filename = os.path.join(output_folder, 'save-05.03.2024_11.10.35')
 
 if os.path.isfile(filename+'/best_model.zip'):
     path = filename+'/best_model.zip'

@@ -77,6 +77,10 @@ class BaseGeoRLAviary(BaseAviary):
         self.error_buffer = deque(maxlen = self.ERROR_BUFFER_SIZE)
         for _ in range(self.ERROR_BUFFER_SIZE):
             self.error_buffer.append(np.zeros(12))
+        self.NORM_ERROR_BUFFER_SIZE = int(pyb_freq / (update_freq * 5))
+        self.norm_error_buffer = deque(maxlen = self.NORM_ERROR_BUFFER_SIZE)
+        for _ in range(self.NORM_ERROR_BUFFER_SIZE):
+            self.norm_error_buffer.append(np.zeros(1))
 
         ####
         vision_attributes = True if obs == ObservationType.RGB else False
@@ -176,9 +180,9 @@ class BaseGeoRLAviary(BaseAviary):
 
         # TODO : initialize random number generator with seed
         if self.ACT_TYPE == ActionType.GEO:
-            self.ctrl[0].k_x = 15 * 0.01
+            self.ctrl[0].k_x = np.power(2, 5 * np.random.rand() + 0.01) * 0.01
             self.ctrl[0].k_v = 1 * 0.01
-            self.ctrl[0].k_R = 15 * 0.0001
+            self.ctrl[0].k_R = 5 * 0.0001
             self.ctrl[0].k_omega = 1 * 0.0001
         p.resetSimulation(physicsClientId=self.CLIENT)
         #### Housekeeping ##########################################
@@ -226,6 +230,7 @@ class BaseGeoRLAviary(BaseAviary):
             in each subclass for its format.
 
         """
+        reward = 0
 
         #### Read the GUI's input parameters #######################
         if self.GUI and self.USER_DEBUG:
@@ -251,7 +256,7 @@ class BaseGeoRLAviary(BaseAviary):
         #### Save, preprocess, and clip the action to the max. RPM #
         else:
             clipped_action = np.reshape(self._preprocessAction(action), (self.NUM_DRONES, 4))
-            #print("the four parameters", self.ctrl[0].k_x, self.ctrl[0].k_v, self.ctrl[0].k_R, self.ctrl[0].k_omega)
+            print("the four parameters", self.ctrl[0].k_x, self.ctrl[0].k_v, self.ctrl[0].k_R, self.ctrl[0].k_omega)
         #### Repeat for as many as the aggregate physics steps #####
         for _ in range(self.PYB_STEPS_PER_CTRL):
             #### Update and store the drones kinematic info for certain
@@ -304,6 +309,9 @@ class BaseGeoRLAviary(BaseAviary):
                 current_error = np.hstack([e_x, e_v, rot_e, omega_e])
                 self.error_buffer.append(current_error)
 
+                #Caculate the reward
+                reward += self._computeReward()
+
             #### PyBullet computes the new state, unless Physics.DYN ###
             if self.PHYSICS != Physics.DYN:
                 p.stepSimulation(physicsClientId=self.CLIENT)
@@ -313,7 +321,6 @@ class BaseGeoRLAviary(BaseAviary):
             self._updateAndStoreKinematicInformation()
         #### Prepare the return values #############################
         obs = self._computeObs()
-        reward = self._computeReward()
         terminated = self._computeTerminated()
         truncated = self._computeTruncated()
         info = self._computeInfo()
@@ -332,10 +339,12 @@ class BaseGeoRLAviary(BaseAviary):
             A Box of size NUM_DRONES x 4, 3, or 1, depending on the action type.
 
         """
-        if self.ACT_TYPE in [ActionType.RPM, ActionType.VEL, ActionType.GEO]:
+        if self.ACT_TYPE in [ActionType.RPM, ActionType.VEL]:
             size = 4
         elif self.ACT_TYPE == ActionType.PID:
             size = 3
+        elif self.ACT_TYPE == ActionType.GEO:
+            size = 2
         elif self.ACT_TYPE in [ActionType.ONE_D_RPM, ActionType.ONE_D_PID]:
             size = 1
         else:
@@ -404,8 +413,8 @@ class BaseGeoRLAviary(BaseAviary):
             elif self.ACT_TYPE == ActionType.GEO:
                 self.ctrl[k].k_x *= np.power(10, action[k,0])
                 self.ctrl[k].k_v *= np.power(10, action[k,1])
-                self.ctrl[k].k_R *= np.power(10, action[k,2])
-                self.ctrl[k].k_omega *= np.power(10, action[k,3])
+                #self.ctrl[k].k_R *= np.power(10, action[k,2])
+                #self.ctrl[k].k_omega *= np.power(10, action[k,3])
                 #print(action[k])
                 #print("the four parameters", self.ctrl[k].k_x, self.ctrl[k].k_v, self.ctrl[k].k_R, self.ctrl[k].k_omega)
                 state = self._getDroneStateVector(k)
@@ -497,10 +506,10 @@ class BaseGeoRLAviary(BaseAviary):
         elif self.OBS_TYPE == ObservationType.KIN and self.ACT_TYPE == ActionType.GEO:
             """ Observation space of 4 variables: e_x, e_v, e_R, e_Omega
             """
-            lo = -np.inf
+            lo = 0 #-np.inf
             hi = np.inf
-            obs_lower_bound = np.array([[lo,lo,lo,lo,lo,lo,lo,lo,lo,lo,lo,lo] for i in range(self.OBSERVATION_BUFFER_SIZE)])
-            obs_upper_bound = np.array([[hi,hi,hi,hi,hi,hi,hi,hi,hi,hi,hi,hi] for i in range(self.OBSERVATION_BUFFER_SIZE)])
+            obs_lower_bound = np.array([[lo] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
+            obs_upper_bound = np.array([[hi] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
             return spaces.Box(low=obs_lower_bound, high=obs_upper_bound, dtype=np.float32)
         else:
             print("[ERROR] in BaseRLAviary._observationSpace()")
@@ -546,8 +555,18 @@ class BaseGeoRLAviary(BaseAviary):
             ############################################################
         
         elif self.OBS_TYPE == ObservationType.KIN and self.ACT_TYPE == ActionType.GEO:
-            
-            return np.asarray(self.error_buffer)
+            # return the absolute value of the observation
+            for i in range(self.NORM_ERROR_BUFFER_SIZE):
+                e_x = self.error_buffer[5*i + 4][0:3]
+                e_v = self.error_buffer[5*i + 4][3:6]
+                e_R = self.error_buffer[5*i + 4][6:9]
+                e_omega = self.error_buffer[5*i + 4][9:12]
+
+                norm_error = np.linalg.norm(e_x)#np.hstack([np.linalg.norm(e_x), np.linalg.norm(e_v), np.linalg.norm(e_R), np.linalg.norm(e_omega)])
+                self.norm_error_buffer.append(norm_error)
+
+            #return np.ones((6,4))
+            return np.asarray(np.reshape(self.norm_error_buffer, (6,1)))
 
         else:
             print("[ERROR] in BaseRLAviary._computeObs()")
