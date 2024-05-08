@@ -75,7 +75,8 @@ class GeoHoverAviary(BaseGeoRLAviary):
 
         """
         state = self._getDroneStateVector(0)
-        ret = (1 - np.linalg.norm(self.TARGET_POS-state[0:3])**2) - 0.4 * (np.linalg.norm(state[10:13])**2)
+        time_elapsed = int(self.step_counter/self.PYB_FREQ) + 1 # elapsed time in seconds + 1
+        ret = (3 / time_elapsed)*(1 - np.linalg.norm(self.TARGET_POS-state[0:3])**2) - (time_elapsed / 6) * (np.linalg.norm(state[10:13])**2)
         return ret
 
     ################################################################################
@@ -90,7 +91,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
 
         """
         state = self._getDroneStateVector(0)
-        if np.linalg.norm(self.TARGET_POS-state[0:3]) < .0001:
+        if np.linalg.norm(self.TARGET_POS-state[0:3]) < .0000001:
             return True
         else:
             return False
@@ -107,7 +108,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
 
         """
         state = self._getDroneStateVector(0)
-        if (abs(state[0]) > 1.5 or abs(state[1]) > 1.5 or state[2] > 2.0 # Truncate when the drone is too far away
+        if (abs(state[0]) > 5 or abs(state[1]) > 5 or state[2] > 10  # Truncate when the drone is too far away
              or abs(state[7]) > .4 or abs(state[8]) > .4 # Truncate when the drone is too tilted
         ):
             return True

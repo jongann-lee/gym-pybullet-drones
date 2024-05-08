@@ -37,13 +37,13 @@ record_video = DEFAULT_RECORD_VIDEO
 colab = DEFAULT_COLAB
 plot = True
 
-filename = os.path.join(output_folder, 'save-05.03.2024_11.10.35')
+filename = os.path.join(output_folder, 'save-05.08.2024_01.32.44')
 
 if os.path.isfile(filename+'/best_model.zip'):
     path = filename+'/best_model.zip'
 else:
     print("[ERROR]: no model under the specified path", filename)
-model = PPO.load(path)
+model = TD3.load(path)
 
 #### Show (and record a video of) the model's performance ##
 test_env = GeoHoverAviary(gui=gui,

@@ -65,9 +65,9 @@ def run(
     H = .1
     H_STEP = .05
     R = .3
-    INIT_XYZS = np.array([[1,0,0] for i in range(num_drones)])
+    INIT_XYZS = np.array([[0,0,1] for i in range(num_drones)])
     #INIT_RPYS = np.zeros(3)
-    INIT_RPYS = np.array([[0, 0,  i * (np.pi/2)/num_drones] for i in range(num_drones)])
+    INIT_RPYS = np.array([[np.pi/3, np.pi/3, 0] for i in range(num_drones)])
 
     #### Hovering Trajectory ###################################
     TARGET_POS = np.array([0, 0, 1])

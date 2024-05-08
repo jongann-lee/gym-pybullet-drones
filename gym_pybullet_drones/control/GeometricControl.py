@@ -32,10 +32,10 @@ class GeometricControl(BaseControl):
         if self.DRONE_MODEL != DroneModel.CF2X and self.DRONE_MODEL != DroneModel.CF2P:
             print("[ERROR] in GeometricControl.__init__(), GeometricControl requires DroneModel.CF2X or DroneModel.CF2P")
             exit()
-        self.k_x = 15 * 0.01         # optimal value 5 * 0.01
-        self.k_v = 1 * 0.01         # optimal value 4 * 0.01
-        self.k_R = 5 * 0.0001       # optimal value 5 * 0.0001
-        self.k_omega = 1 * 0.0001   # optimal value 1 * 0.0001
+        self.k_x = 5 * 0.01         # optimal value 5 * 0.01
+        self.k_v = 4 * 0.01         # optimal value 4 * 0.01
+        self.k_R = 5 * 0.01       # optimal value 5 * 0.0001
+        self.k_omega = 0.1 * 0.01   # optimal value 1 * 0.0001
         #print("GeoCon Init")
         self.PWM2RPM_SCALE = 0.2685
         self.PWM2RPM_CONST = 4070.3

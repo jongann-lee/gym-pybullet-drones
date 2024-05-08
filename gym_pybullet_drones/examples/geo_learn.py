@@ -27,6 +27,7 @@ from stable_baselines3.common.noise import NormalActionNoise
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 from gym_pybullet_drones.utils.Logger import Logger
 from gym_pybullet_drones.envs.GeoHoverAviary import GeoHoverAviary
@@ -44,6 +45,38 @@ DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
 DEFAULT_ACT = ActionType('geo') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 DEFAULT_DRONEMODEL = DroneModel("cf2x")
 DEFAULT_MA = False
+
+class CustomCNN(BaseFeaturesExtractor):
+    """
+    :param observation_space: (gym.Space)
+    :param features_dim: (int) Number of features extracted.
+        This corresponds to the number of unit for the last layer.
+    """
+
+    def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 32):
+        super().__init__(observation_space, features_dim)
+        # We assume CxHxW images (channels first)
+        # Re-ordering will be done by pre-preprocessing or wrapper
+        n_input_channels = observation_space.shape[0]
+        print(n_input_channels)
+        self.cnn = torch.nn.Sequential(
+            torch.nn.Conv1d(n_input_channels, 16, kernel_size=4, stride=2, padding=0),
+            torch.nn.ReLU(),
+            torch.nn.Conv1d(16, 64, kernel_size=4, stride=2, padding=0),
+            torch.nn.ReLU(),
+            torch.nn.Flatten(),
+        )
+
+        # Compute shape by doing one forward pass
+        with torch.no_grad():
+            n_flatten = self.cnn(
+                torch.as_tensor(observation_space.sample()[None]).float()
+            ).shape[1]
+
+        self.linear = torch.nn.Sequential(torch.nn.Linear(n_flatten, features_dim), torch.nn.ReLU())
+
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        return self.linear(self.cnn(observations))
 
 def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=DEFAULT_COLAB, record_video=DEFAULT_RECORD_VIDEO, local=True):
 
@@ -68,20 +101,31 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                            net_arch=dict(vf=[256, 256], pi=[256, 128])
                            )
     offpolicy_kwargs = dict(activation_fn=torch.nn.ReLU,
-                            net_arch=[1024, 256, 256, 128]
+                            net_arch=dict(pi=[512, 256], qf=[512, 256])
                             )
+    cnnpolicy_kwargs = dict(
+    features_extractor_class=CustomCNN,
+    features_extractor_kwargs=dict(features_dim=32),
+    )
     n_actions = train_env.action_space.shape[-1]
-    actionnoise = NormalActionNoise(mean=np.zeros(n_actions), sigma = 0.5*np.ones(n_actions))
+    actionnoise = NormalActionNoise(mean=np.zeros(n_actions), sigma = 0.1*np.ones(n_actions))
 
-    model = PPO('MlpPolicy',
+    model = TD3('MlpPolicy',
                 train_env,
-                policy_kwargs = onpolicy_kwargs,
-                ent_coef = 0.1,
-                clip_range = 0.4, 
-                learning_rate = 0.00001, 
-                #action_noise=actionnoise,
+                policy_kwargs = offpolicy_kwargs,
+                buffer_size= 200000,
+                learning_rate = 0.001, 
+                action_noise=actionnoise,
                 # tensorboard_log=filename+'/tb/',
                 verbose=1)
+    
+    #### Optional: load a previous model
+    load_name = os.path.join(output_folder, 'save-05.06.2024_02.09.37/best_model.zip')
+    #model = TD3.load(load_name)
+    #model.set_parameters(load_path_or_dict=load_name)
+    #model.set_env(train_env)
+    #model.action_noise = actionnoise
+    #model.learning_rate = 0.00005
 
     #### Target cumulative rewards (problem-dependent) ##########
     if DEFAULT_ACT == ActionType.ONE_D_RPM:
@@ -99,7 +143,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                                  eval_freq=int(1000),
                                  deterministic=True,
                                  render=False)
-    model.learn(total_timesteps=int(3e6) if local else int(1e2), # shorter training in GitHub Actions pytest
+    model.learn(total_timesteps=int(1e6) if local else int(1e2), # shorter training in GitHub Actions pytest
                 callback=eval_callback,
                 log_interval=100)
 
@@ -128,7 +172,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
         path = filename+'/best_model.zip'
     else:
         print("[ERROR]: no model under the specified path", filename)
-    model = PPO.load(path)
+    model = TD3.load(path)
 
     #### Show (and record a video of) the model's performance ##
     test_env = GeoHoverAviary(gui=gui,

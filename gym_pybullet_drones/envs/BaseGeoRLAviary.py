@@ -77,7 +77,7 @@ class BaseGeoRLAviary(BaseAviary):
         self.error_buffer = deque(maxlen = self.ERROR_BUFFER_SIZE)
         for _ in range(self.ERROR_BUFFER_SIZE):
             self.error_buffer.append(np.zeros(12))
-        self.NORM_ERROR_BUFFER_SIZE = int(pyb_freq / (update_freq * 5))
+        self.NORM_ERROR_BUFFER_SIZE = int(pyb_freq / (update_freq))
         self.norm_error_buffer = deque(maxlen = self.NORM_ERROR_BUFFER_SIZE)
         for _ in range(self.NORM_ERROR_BUFFER_SIZE):
             self.norm_error_buffer.append(np.zeros(1))
@@ -180,10 +180,10 @@ class BaseGeoRLAviary(BaseAviary):
 
         # TODO : initialize random number generator with seed
         if self.ACT_TYPE == ActionType.GEO:
-            self.ctrl[0].k_x = np.power(2, 5 * np.random.rand() + 0.01) * 0.01
+            self.ctrl[0].k_x = 15 * 0.01 #np.power(2, 5 * np.random.rand() + 0.01) * 0.01
             self.ctrl[0].k_v = 1 * 0.01
-            self.ctrl[0].k_R = 5 * 0.0001
-            self.ctrl[0].k_omega = 1 * 0.0001
+            self.ctrl[0].k_R = 5 * 0.01
+            self.ctrl[0].k_omega = 1 * 0.001
         p.resetSimulation(physicsClientId=self.CLIENT)
         #### Housekeeping ##########################################
         self._housekeeping()
@@ -256,7 +256,7 @@ class BaseGeoRLAviary(BaseAviary):
         #### Save, preprocess, and clip the action to the max. RPM #
         else:
             clipped_action = np.reshape(self._preprocessAction(action), (self.NUM_DRONES, 4))
-            print("the four parameters", self.ctrl[0].k_x, self.ctrl[0].k_v, self.ctrl[0].k_R, self.ctrl[0].k_omega)
+            #print("the four parameters", self.ctrl[0].k_x, self.ctrl[0].k_v, self.ctrl[0].k_R, self.ctrl[0].k_omega)
         #### Repeat for as many as the aggregate physics steps #####
         for _ in range(self.PYB_STEPS_PER_CTRL):
             #### Update and store the drones kinematic info for certain
@@ -326,6 +326,7 @@ class BaseGeoRLAviary(BaseAviary):
         info = self._computeInfo()
         #### Advance the step counter ##############################
         self.step_counter = self.step_counter + (1 * self.PYB_STEPS_PER_CTRL)
+        #print(reward)
         return obs, reward, terminated, truncated, info
     
     ################################################################################
@@ -557,16 +558,16 @@ class BaseGeoRLAviary(BaseAviary):
         elif self.OBS_TYPE == ObservationType.KIN and self.ACT_TYPE == ActionType.GEO:
             # return the absolute value of the observation
             for i in range(self.NORM_ERROR_BUFFER_SIZE):
-                e_x = self.error_buffer[5*i + 4][0:3]
-                e_v = self.error_buffer[5*i + 4][3:6]
-                e_R = self.error_buffer[5*i + 4][6:9]
-                e_omega = self.error_buffer[5*i + 4][9:12]
+                e_x = self.error_buffer[i][0:3]
+                e_v = self.error_buffer[i][3:6]
+                e_R = self.error_buffer[i][6:9]
+                e_omega = self.error_buffer[i][9:12]
 
                 norm_error = np.linalg.norm(e_x)#np.hstack([np.linalg.norm(e_x), np.linalg.norm(e_v), np.linalg.norm(e_R), np.linalg.norm(e_omega)])
                 self.norm_error_buffer.append(norm_error)
 
             #return np.ones((6,4))
-            return np.asarray(np.reshape(self.norm_error_buffer, (6,1)))
+            return np.asarray(np.reshape(self.norm_error_buffer, (30,1)))
 
         else:
             print("[ERROR] in BaseRLAviary._computeObs()")
