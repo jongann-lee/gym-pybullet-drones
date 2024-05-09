@@ -108,14 +108,17 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     features_extractor_kwargs=dict(features_dim=32),
     )
     n_actions = train_env.action_space.shape[-1]
-    actionnoise = NormalActionNoise(mean=np.zeros(n_actions), sigma = 0.1*np.ones(n_actions))
+    actionnoise = NormalActionNoise(mean=np.zeros(n_actions), sigma = 0.5*np.ones(n_actions))
 
     model = TD3('MlpPolicy',
                 train_env,
                 policy_kwargs = offpolicy_kwargs,
                 buffer_size= 200000,
-                learning_rate = 0.001, 
+                learning_starts= 1000,
+                learning_rate = 0.0007, 
                 action_noise=actionnoise,
+                batch_size = 256,
+                gradient_steps= -1,
                 # tensorboard_log=filename+'/tb/',
                 verbose=1)
     

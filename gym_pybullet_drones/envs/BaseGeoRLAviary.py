@@ -256,7 +256,7 @@ class BaseGeoRLAviary(BaseAviary):
         #### Save, preprocess, and clip the action to the max. RPM #
         else:
             clipped_action = np.reshape(self._preprocessAction(action), (self.NUM_DRONES, 4))
-            #print("the four parameters", self.ctrl[0].k_x, self.ctrl[0].k_v, self.ctrl[0].k_R, self.ctrl[0].k_omega)
+            print("the four parameters", self.ctrl[0].k_x, self.ctrl[0].k_v, self.ctrl[0].k_R, self.ctrl[0].k_omega)
         #### Repeat for as many as the aggregate physics steps #####
         for _ in range(self.PYB_STEPS_PER_CTRL):
             #### Update and store the drones kinematic info for certain
@@ -508,7 +508,7 @@ class BaseGeoRLAviary(BaseAviary):
             """ Observation space of 4 variables: e_x, e_v, e_R, e_Omega
             """
             lo = 0 #-np.inf
-            hi = np.inf
+            hi = 10
             obs_lower_bound = np.array([[lo] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
             obs_upper_bound = np.array([[hi] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
             return spaces.Box(low=obs_lower_bound, high=obs_upper_bound, dtype=np.float32)
