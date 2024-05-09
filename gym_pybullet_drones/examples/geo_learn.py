@@ -108,24 +108,24 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     features_extractor_kwargs=dict(features_dim=32),
     )
     n_actions = train_env.action_space.shape[-1]
-    actionnoise = NormalActionNoise(mean=np.zeros(n_actions), sigma = 0.5*np.ones(n_actions))
+    actionnoise = NormalActionNoise(mean=np.zeros(n_actions), sigma = 0.1*np.ones(n_actions))
 
     model = TD3('MlpPolicy',
                 train_env,
                 policy_kwargs = offpolicy_kwargs,
                 buffer_size= 200000,
                 learning_starts= 1000,
-                learning_rate = 0.0007, 
+                learning_rate = 0.001, 
                 action_noise=actionnoise,
                 batch_size = 256,
-                gradient_steps= -1,
+                gradient_steps= 1,
                 # tensorboard_log=filename+'/tb/',
                 verbose=1)
     
     #### Optional: load a previous model
-    load_name = os.path.join(output_folder, 'save-05.06.2024_02.09.37/best_model.zip')
+    load_name = os.path.join(output_folder, 'save-05.09.2024_10.48.51/best_model.zip') # save-05.06.2024_02.09.37
     #model = TD3.load(load_name)
-    #model.set_parameters(load_path_or_dict=load_name)
+    model.set_parameters(load_path_or_dict=load_name)
     #model.set_env(train_env)
     #model.action_noise = actionnoise
     #model.learning_rate = 0.00005
@@ -146,7 +146,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                                  eval_freq=int(1000),
                                  deterministic=True,
                                  render=False)
-    model.learn(total_timesteps=int(1e6) if local else int(1e2), # shorter training in GitHub Actions pytest
+    model.learn(total_timesteps=int(2e5) if local else int(1e2), # shorter training in GitHub Actions pytest
                 callback=eval_callback,
                 log_interval=100)
 
@@ -210,7 +210,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
             print("\tAction", action)
         
         obs2 = test_env.observation_buffer[i % test_env.PYB_STEPS_PER_CTRL][:]
-        print("Obs:", obs2)
+        #print("Obs:", obs2)
         
         
         #print("Obs:", obs2, "\tReward:", reward, "\tTerminated:", terminated, "\tTruncated:", truncated)
