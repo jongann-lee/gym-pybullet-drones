@@ -192,7 +192,7 @@ class BaseGeoRLAviary(BaseAviary):
         #### Start video recording #################################
         self._startVideoRecording()
         #### Return the initial observation ########################
-        initial_obs = self._computeObs()
+        initial_obs, _ , _ , _ , _ = self.step(np.zeros((1,4)))
         initial_info = self._computeInfo()
         return initial_obs, initial_info
     
@@ -256,7 +256,7 @@ class BaseGeoRLAviary(BaseAviary):
         #### Save, preprocess, and clip the action to the max. RPM #
         else:
             clipped_action = np.reshape(self._preprocessAction(action), (self.NUM_DRONES, 4))
-            #print("the four parameters", self.ctrl[0].k_x, self.ctrl[0].k_v, self.ctrl[0].k_R, self.ctrl[0].k_omega)
+            print("the four parameters", self.ctrl[0].k_x, self.ctrl[0].k_v, self.ctrl[0].k_R, self.ctrl[0].k_omega)
         #### Repeat for as many as the aggregate physics steps #####
         for _ in range(self.PYB_STEPS_PER_CTRL):
             #### Update and store the drones kinematic info for certain
