@@ -37,7 +37,7 @@ record_video = DEFAULT_RECORD_VIDEO
 colab = DEFAULT_COLAB
 plot = True
 
-filename = os.path.join(output_folder, 'save-05.09.2024_23.47.39')
+filename = os.path.join(output_folder, 'save-05.10.2024_11.35.04')
 
 if os.path.isfile(filename+'/best_model.zip'):
     path = filename+'/best_model.zip'
@@ -67,7 +67,7 @@ print("\n\n\nMean reward ", mean_reward, " +- ", std_reward, "\n\n")
 obs, info = test_env.reset(seed=42, options={})
 start = time.time()
 
-for i in range((test_env.EPISODE_LEN_SEC+2)*test_env.PYB_FREQ):
+for i in range((test_env.EPISODE_LEN_SEC)*test_env.PYB_FREQ):
     if (i % test_env.PYB_STEPS_PER_CTRL) == 0:
         action, _states = model.predict(obs,
                                     deterministic=True

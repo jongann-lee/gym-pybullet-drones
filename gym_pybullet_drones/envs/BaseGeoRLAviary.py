@@ -180,7 +180,7 @@ class BaseGeoRLAviary(BaseAviary):
 
         # TODO : initialize random number generator with seed
         if self.ACT_TYPE == ActionType.GEO:
-            self.ctrl[0].k_x = 30 * 0.01 #np.power(2, 5 * np.random.rand() + 0.01) * 0.01
+            self.ctrl[0].k_x = 40 * 0.01 #np.power(2, 5 * np.random.rand() + 0.01) * 0.01
             self.ctrl[0].k_v = 1 * 0.01
             self.ctrl[0].k_R = 5 * 0.01
             self.ctrl[0].k_omega = 1 * 0.001
@@ -508,7 +508,7 @@ class BaseGeoRLAviary(BaseAviary):
             """ Observation space of 4 variables: e_x, e_v, e_R, e_Omega
             """
             lo = 0 #-np.inf
-            hi = 10
+            hi = 3
             obs_lower_bound = np.array([[lo] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
             obs_upper_bound = np.array([[hi] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
             return spaces.Box(low=obs_lower_bound, high=obs_upper_bound, dtype=np.float32)
