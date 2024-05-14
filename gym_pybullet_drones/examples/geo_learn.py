@@ -115,15 +115,15 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                 policy_kwargs = offpolicy_kwargs,
                 buffer_size= 200000,
                 learning_starts= 1000,
-                learning_rate = 0.001, 
+                learning_rate = 0.0001, 
                 action_noise=actionnoise,
                 batch_size = 256,
-                gradient_steps= -1,
+                gradient_steps= 1,
                 # tensorboard_log=filename+'/tb/',
                 verbose=1)
     
     #### Optional: load a previous model
-    load_name = os.path.join(output_folder, 'save-05.09.2024_10.48.51/best_model.zip') # save-05.06.2024_02.09.37
+    load_name = os.path.join(output_folder, 'save-05.11.2024_21.33.47/best_model.zip') # save-05.06.2024_02.09.37
     #model = TD3.load(load_name)
     model.set_parameters(load_path_or_dict=load_name)
     #model.set_env(train_env)

@@ -76,7 +76,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
         """
         state = self._getDroneStateVector(0)
         time_elapsed = int(self.step_counter/self.PYB_FREQ) + 1 # elapsed time in seconds + 1
-        ret = (3 / time_elapsed)*(4 - np.linalg.norm(self.TARGET_POS-state[0:3])**2) - (time_elapsed / 6) * (np.linalg.norm(state[10:13])**2)
+        ret = (4 - np.linalg.norm(self.TARGET_POS-state[0:3])**2) #- (time_elapsed / 6) * (np.linalg.norm(state[10:13])**2)
         return ret
 
     ################################################################################

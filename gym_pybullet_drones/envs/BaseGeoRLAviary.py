@@ -180,7 +180,7 @@ class BaseGeoRLAviary(BaseAviary):
 
         # TODO : initialize random number generator with seed
         if self.ACT_TYPE == ActionType.GEO:
-            self.ctrl[0].k_x = 40 * 0.01 #np.power(2, 5 * np.random.rand() + 0.01) * 0.01
+            self.ctrl[0].k_x = 15 * 0.01 #np.power(2, 5 * np.random.rand() + 0.01) * 0.01
             self.ctrl[0].k_v = 1 * 0.01
             self.ctrl[0].k_R = 5 * 0.01
             self.ctrl[0].k_omega = 1 * 0.001
@@ -256,7 +256,7 @@ class BaseGeoRLAviary(BaseAviary):
         #### Save, preprocess, and clip the action to the max. RPM #
         else:
             clipped_action = np.reshape(self._preprocessAction(action), (self.NUM_DRONES, 4))
-            print("the four parameters", self.ctrl[0].k_x, self.ctrl[0].k_v, self.ctrl[0].k_R, self.ctrl[0].k_omega)
+            #print("the four parameters", self.ctrl[0].k_x, self.ctrl[0].k_v, self.ctrl[0].k_R, self.ctrl[0].k_omega)
         #### Repeat for as many as the aggregate physics steps #####
         for _ in range(self.PYB_STEPS_PER_CTRL):
             #### Update and store the drones kinematic info for certain
