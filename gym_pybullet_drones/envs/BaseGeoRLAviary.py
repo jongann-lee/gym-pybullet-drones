@@ -76,11 +76,11 @@ class BaseGeoRLAviary(BaseAviary):
         self.ERROR_BUFFER_SIZE = int(pyb_freq / update_freq)
         self.error_buffer = deque(maxlen = self.ERROR_BUFFER_SIZE)
         for _ in range(self.ERROR_BUFFER_SIZE):
-            self.error_buffer.append(np.zeros(12))
+            self.error_buffer.append(np.zeros(10))
         self.NORM_ERROR_BUFFER_SIZE = int(pyb_freq / (update_freq))
         self.norm_error_buffer = deque(maxlen = self.NORM_ERROR_BUFFER_SIZE)
         for _ in range(self.NORM_ERROR_BUFFER_SIZE):
-            self.norm_error_buffer.append(np.zeros(1))
+            self.norm_error_buffer.append(np.zeros(2))
 
         ####
         vision_attributes = True if obs == ObservationType.RGB else False
@@ -180,19 +180,21 @@ class BaseGeoRLAviary(BaseAviary):
 
         # TODO : initialize random number generator with seed
         if self.ACT_TYPE == ActionType.GEO:
-            self.ctrl[0].k_x = 15 * 0.01 #np.power(2, 5 * np.random.rand() + 0.01) * 0.01
-            self.ctrl[0].k_v = 1 * 0.01
-            self.ctrl[0].k_R = 5 * 0.01
-            self.ctrl[0].k_omega = 1 * 0.001
+            self.ctrl[0].k_x = 5 * 0.01 #np.power(2, 5 * np.random.rand() + 0.01) * 0.01
+            self.ctrl[0].k_v = 4 * 0.01
+            self.ctrl[0].k_R = 5 * np.power(10, 2 * np.random.rand() - 1) * 0.01
+            self.ctrl[0].k_omega = 0.1 * np.power(4, 2 * np.random.rand() - 1) * 0.01
         p.resetSimulation(physicsClientId=self.CLIENT)
         #### Housekeeping ##########################################
         self._housekeeping()
+        self.pos = np.array([[0,0,1] for i in range(1)])
+        self.rpy = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)])
         #### Update and store the drones kinematic information #####
         self._updateAndStoreKinematicInformation()
         #### Start video recording #################################
         self._startVideoRecording()
         #### Return the initial observation ########################
-        initial_obs, _ , _ , _ , _ = self.step(np.zeros((1,4)))
+        initial_obs, _ , _ , _ , _ = self.step(np.zeros((1,2)))
         initial_info = self._computeInfo()
         return initial_obs, initial_info
     
@@ -264,7 +266,7 @@ class BaseGeoRLAviary(BaseAviary):
             if self.PYB_STEPS_PER_CTRL > 1 and self.PHYSICS in [Physics.DYN, Physics.PYB_GND, Physics.PYB_DRAG, Physics.PYB_DW, Physics.PYB_GND_DRAG_DW]:
                 self._updateAndStoreKinematicInformation()
             #### Update the clipped action every iteration so that the controller runs correctly in the background
-            clipped_action = np.reshape(self._preprocessAction(np.zeros((1,4))), (self.NUM_DRONES, 4))
+            clipped_action = np.reshape(self._preprocessAction(np.zeros((1,2))), (self.NUM_DRONES, 4))
             #### Step the simulation using the desired physics update ##
             for i in range (self.NUM_DRONES):
                 if self.PHYSICS == Physics.PYB:
@@ -300,10 +302,9 @@ class BaseGeoRLAviary(BaseAviary):
                 cur_ang_v = obs[13:16] # in the world frame
                 cur_rotation = np.array(p.getMatrixFromQuaternion(cur_quat)).reshape(3, 3)
                 cur_angular_vel = cur_rotation.transpose() @ cur_ang_v # angular velocity now in body frame
-                target_rotation = np.identity(3)
-                target_angular_vel = np.zeros(3)
-                rot_matrix_e = (target_rotation.transpose())@cur_rotation - (cur_rotation.transpose())@target_rotation
-                rot_e = 0.5 * np.array([rot_matrix_e[2, 1], rot_matrix_e[0, 2], rot_matrix_e[1, 0]])
+                target_rotation = np.identity(3) # these aren't the values from the controller calculation 
+                target_angular_vel = np.zeros(3) # but since we're observing error from equilibrium, this is fine
+                rot_e = 0.5 * np.trace(np.eye(3) - target_rotation.transpose()@cur_rotation)
                 omega_e = cur_angular_vel - cur_rotation.transpose()@target_rotation@target_angular_vel
                 ### Add the observation to the observation queue
                 current_error = np.hstack([e_x, e_v, rot_e, omega_e])
@@ -412,10 +413,10 @@ class BaseGeoRLAviary(BaseAviary):
                                                         )
                 rpm[k,:] = rpm_k
             elif self.ACT_TYPE == ActionType.GEO:
-                self.ctrl[k].k_x *= np.power(10, action[k,0])
-                self.ctrl[k].k_v *= np.power(10, action[k,1])
-                #self.ctrl[k].k_R *= np.power(10, action[k,2])
-                #self.ctrl[k].k_omega *= np.power(10, action[k,3])
+                # self.ctrl[k].k_x *= np.power(10, action[k,0])
+                # self.ctrl[k].k_v *= np.power(10, action[k,1])
+                self.ctrl[k].k_R *= np.power(10, action[k,0])
+                self.ctrl[k].k_omega *= np.power(10, action[k,1])
                 #print(action[k])
                 #print("the four parameters", self.ctrl[k].k_x, self.ctrl[k].k_v, self.ctrl[k].k_R, self.ctrl[k].k_omega)
                 state = self._getDroneStateVector(k)
@@ -508,9 +509,9 @@ class BaseGeoRLAviary(BaseAviary):
             """ Observation space of 4 variables: e_x, e_v, e_R, e_Omega
             """
             lo = 0 #-np.inf
-            hi = 3
-            obs_lower_bound = np.array([[lo] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
-            obs_upper_bound = np.array([[hi] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
+            hi = np.inf
+            obs_lower_bound = np.array([[0, lo] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
+            obs_upper_bound = np.array([[2, hi] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
             return spaces.Box(low=obs_lower_bound, high=obs_upper_bound, dtype=np.float32)
         else:
             print("[ERROR] in BaseRLAviary._observationSpace()")
@@ -560,14 +561,15 @@ class BaseGeoRLAviary(BaseAviary):
             for i in range(self.NORM_ERROR_BUFFER_SIZE):
                 e_x = self.error_buffer[i][0:3]
                 e_v = self.error_buffer[i][3:6]
-                e_R = self.error_buffer[i][6:9]
-                e_omega = self.error_buffer[i][9:12]
+                e_R = self.error_buffer[i][6]
+                e_omega = self.error_buffer[i][7:10]
 
-                norm_error = np.linalg.norm(e_x)#np.hstack([np.linalg.norm(e_x), np.linalg.norm(e_v), np.linalg.norm(e_R), np.linalg.norm(e_omega)])
+                norm_error = np.hstack([e_R, np.linalg.norm(e_omega)])
+                #np.hstack([np.linalg.norm(e_x), np.linalg.norm(e_v), np.linalg.norm(e_R), np.linalg.norm(e_omega)])
                 self.norm_error_buffer.append(norm_error)
 
             #return np.ones((6,4))
-            return np.asarray(np.reshape(self.norm_error_buffer, (30,1)))
+            return np.asarray(self.norm_error_buffer)
 
         else:
             print("[ERROR] in BaseRLAviary._computeObs()")

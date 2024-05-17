@@ -37,7 +37,7 @@ record_video = DEFAULT_RECORD_VIDEO
 colab = DEFAULT_COLAB
 plot = True
 
-filename = os.path.join(output_folder, 'save-05.12.2024_00.55.23')
+filename = os.path.join(output_folder, 'save-05.16.2024_01.33.52')
 
 if os.path.isfile(filename+'/best_model.zip'):
     path = filename+'/best_model.zip'
@@ -46,11 +46,15 @@ else:
 model = TD3.load(path)
 
 #### Show (and record a video of) the model's performance ##
-test_env = GeoHoverAviary(gui=gui,
+test_env = GeoHoverAviary(initial_xyzs = np.array([[0,0,1] for i in range(1)]), 
+                        initial_rpys = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
+                        gui=gui,
                         obs=DEFAULT_OBS,
                         act=DEFAULT_ACT,
                         record=record_video)
-test_env_nogui = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+test_env_nogui = GeoHoverAviary(initial_xyzs = np.array([[0,0,1] for i in range(1)]), 
+                                initial_rpys = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
+                                obs=DEFAULT_OBS, act=DEFAULT_ACT)
 
 logger = Logger(logging_freq_hz=int(test_env.PYB_FREQ),
             num_drones=1,

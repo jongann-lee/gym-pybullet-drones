@@ -66,7 +66,7 @@ def run(
     H_STEP = .05
     R = .3
     INIT_XYZS = np.array([[0,0,1] for i in range(num_drones)])
-    #INIT_RPYS = np.zeros(3)
+    #INIT_RPYS = np.array([[0, 0, 0] for i in range(num_drones)])
     INIT_RPYS = np.array([[np.pi/3, np.pi/3, 0] for i in range(num_drones)])
 
     #### Hovering Trajectory ###################################
@@ -144,8 +144,8 @@ def run(
         #### Compute control for the current way point #############
         for j in range(num_drones):
             obs_action = obs[j]
-            action[j, :], _ = ctrl[j].computeControl(drone_m = env.M,
-                                                        drone_J = env.J,
+            action[j, :], _ = ctrl[j].computeControl(drone_m = env.M*1.1, # currently 0.027
+                                                        drone_J = env.J, # currently 1.4, 1.4, 2.17 * e-5
                                                         cur_pos=obs_action[0:3],
                                                         cur_quat=obs_action[3:7],
                                                         cur_vel=obs_action[10:13],

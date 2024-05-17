@@ -13,8 +13,8 @@ class GeoHoverAviary(BaseGeoRLAviary):
                  initial_xyzs=None,
                  initial_rpys=None,
                  physics: Physics=Physics.PYB,
-                 pyb_freq: int = 60,
-                 update_freq: int = 2,
+                 pyb_freq: int = 240,
+                 update_freq: int = 24,
                  gui=False,
                  record=False,
                  obs: ObservationType=ObservationType.KIN,
@@ -49,7 +49,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
 
         """
         self.TARGET_POS = np.array([0,0,1])
-        self.EPISODE_LEN_SEC = 8
+        self.EPISODE_LEN_SEC = 4
         super().__init__(drone_model=drone_model,
                          num_drones=1,
                          initial_xyzs=initial_xyzs,
@@ -74,9 +74,14 @@ class GeoHoverAviary(BaseGeoRLAviary):
             The reward.
 
         """
-        state = self._getDroneStateVector(0)
-        time_elapsed = int(self.step_counter/self.PYB_FREQ) + 1 # elapsed time in seconds + 1
-        ret = (4 - np.linalg.norm(self.TARGET_POS-state[0:3])**2) #- (time_elapsed / 6) * (np.linalg.norm(state[10:13])**2)
+        obs = self._getDroneStateVector(0)
+        time_elapsed = int(self.step_counter/self.PYB_FREQ)  # elapsed time in seconds 
+
+        error = self.error_buffer[-1][:]
+        rot_e = error[6]
+        omega_e = error[7:10]
+        
+        ret = (2 - rot_e) + (0.5 * time_elapsed) * (1 - np.linalg.norm(omega_e))
         return ret
 
     ################################################################################
@@ -109,7 +114,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
         """
         state = self._getDroneStateVector(0)
         if (abs(state[0]) > 2 or abs(state[1]) > 2 or state[2] > 3  # Truncate when the drone is too far away
-             or abs(state[7]) > .4 or abs(state[8]) > .4 # Truncate when the drone is too tilted
+             or abs(state[7]) > 2.4 or abs(state[8]) > 2.4 # Truncate when the drone is too tilted
         ):
             return True
         if self.step_counter/self.PYB_FREQ > self.EPISODE_LEN_SEC:

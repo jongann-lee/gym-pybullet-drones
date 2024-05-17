@@ -85,11 +85,15 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
         os.makedirs(filename+'/')
 
     train_env = make_vec_env(GeoHoverAviary,
-                             env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT),
+                             env_kwargs=dict(initial_xyzs = np.array([[0,0,1] for i in range(1)]), 
+                                            initial_rpys = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
+                                            obs=DEFAULT_OBS, act=DEFAULT_ACT),
                              n_envs=1,
                              seed=0
                              )
-    eval_env = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+    eval_env = GeoHoverAviary(initial_xyzs = np.array([[0,0,1] for i in range(1)]), 
+                                            initial_rpys = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
+                                            obs=DEFAULT_OBS, act=DEFAULT_ACT)
 
     #### Check the environment's spaces ########################
     print('[INFO] Action space:', train_env.action_space)
@@ -101,7 +105,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                            net_arch=dict(vf=[256, 256], pi=[256, 128])
                            )
     offpolicy_kwargs = dict(activation_fn=torch.nn.ReLU,
-                            net_arch=dict(pi=[512, 256], qf=[512, 256])
+                            net_arch=dict(pi=[64, 64], qf=[64, 64])
                             )
     cnnpolicy_kwargs = dict(
     features_extractor_class=CustomCNN,
@@ -115,17 +119,17 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                 policy_kwargs = offpolicy_kwargs,
                 buffer_size= 200000,
                 learning_starts= 1000,
-                learning_rate = 0.0001, 
+                learning_rate = 0.001, 
                 action_noise=actionnoise,
                 batch_size = 256,
-                gradient_steps= 1,
+                gradient_steps= -1,
                 # tensorboard_log=filename+'/tb/',
                 verbose=1)
     
     #### Optional: load a previous model
-    load_name = os.path.join(output_folder, 'save-05.11.2024_21.33.47/best_model.zip') # save-05.06.2024_02.09.37
+    #load_name = os.path.join(output_folder, 'save-05.11.2024_21.33.47/best_model.zip') # save-05.06.2024_02.09.37
     #model = TD3.load(load_name)
-    model.set_parameters(load_path_or_dict=load_name)
+    #model.set_parameters(load_path_or_dict=load_name)
     #model.set_env(train_env)
     #model.action_noise = actionnoise
     #model.learning_rate = 0.00005
@@ -146,7 +150,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                                  eval_freq=int(1000),
                                  deterministic=True,
                                  render=False)
-    model.learn(total_timesteps=int(2e5) if local else int(1e2), # shorter training in GitHub Actions pytest
+    model.learn(total_timesteps=int(2e6) if local else int(1e2), # shorter training in GitHub Actions pytest
                 callback=eval_callback,
                 log_interval=100)
 
@@ -178,11 +182,15 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     model = TD3.load(path)
 
     #### Show (and record a video of) the model's performance ##
-    test_env = GeoHoverAviary(gui=gui,
+    test_env = GeoHoverAviary(initial_xyzs = np.array([[0,0,1] for i in range(1)]), 
+                            initial_rpys = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
+                            gui=gui,
                             obs=DEFAULT_OBS,
                             act=DEFAULT_ACT,
                             record=record_video)
-    test_env_nogui = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+    test_env_nogui = GeoHoverAviary(initial_xyzs = np.array([[0,0,1] for i in range(1)]), 
+                                    initial_rpys = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
+                                    obs=DEFAULT_OBS, act=DEFAULT_ACT)
 
     logger = Logger(logging_freq_hz=int(test_env.CTRL_FREQ),
                 num_drones=1,

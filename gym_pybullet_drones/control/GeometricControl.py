@@ -34,8 +34,8 @@ class GeometricControl(BaseControl):
             exit()
         self.k_x = 5 * 0.01         # optimal value 5 * 0.01
         self.k_v = 4 * 0.01         # optimal value 4 * 0.01
-        self.k_R = 5 * 0.01       # optimal value 5 * 0.0001
-        self.k_omega = 0.1 * 0.01   # optimal value 1 * 0.0001
+        self.k_R = 5 * 0.01       # optimal value 5 * 0.01
+        self.k_omega = 0.5 * 0.01   # optimal value 0.1 * 0.01
         #print("GeoCon Init")
         self.PWM2RPM_SCALE = 0.2685
         self.PWM2RPM_CONST = 4070.3
@@ -141,7 +141,8 @@ class GeometricControl(BaseControl):
                                                                          target_vel,
                                                                          target_acc
                                                                          )
-        rpm = self._GeoAttitudeControl(drone_J,
+        rpm = self._GeoAttitudeControl(drone_m,
+                                          drone_J,
                                           thrust,
                                           cur_quat,
                                           cur_angular_vel,
@@ -196,8 +197,8 @@ class GeometricControl(BaseControl):
 
         """
         cur_rotation = np.array(p.getMatrixFromQuaternion(cur_quat)).reshape(3, 3)
-        pos_e = cur_pos - target_pos
-        vel_e = cur_vel - target_vel
+        pos_e = cur_pos - target_pos # e_x
+        vel_e = cur_vel - target_vel # e_v
         #### Geometric target thrust #####################################
         target_thrust = - self.k_x*pos_e - self.k_v*vel_e + drone_m*np.array([0, 0, 9.8]) + drone_m*target_acc
         scalar_thrust = max(0., np.dot(target_thrust, cur_rotation[:,2]))
@@ -206,13 +207,14 @@ class GeometricControl(BaseControl):
         target_x_c = np.array([math.cos(target_rpy[2]), math.sin(target_rpy[2]), 0])
         target_y_ax = np.cross(target_z_ax, target_x_c) / np.linalg.norm(np.cross(target_z_ax, target_x_c))
         target_x_ax = np.cross(target_y_ax, target_z_ax)
-        target_rotation = (np.vstack([target_x_ax, target_y_ax, target_z_ax])).transpose()
+        target_rotation = (np.vstack([target_x_ax, target_y_ax, target_z_ax])).transpose() # check to see if correct and not transposed incorrectly
         target_rpy = (Rotation.from_matrix(target_rotation)).as_euler('XYZ', degrees=False)
         return scalar_thrust, target_rotation, pos_e
     
     ################################################################################
 
     def _GeoAttitudeControl(self,
+                               drone_m,
                                drone_J,
                                thrust,
                                cur_quat,
@@ -253,10 +255,32 @@ class GeometricControl(BaseControl):
         rot_matrix_e = (target_rotation.transpose())@cur_rotation - (cur_rotation.transpose())@target_rotation
         rot_e = 0.5 * np.array([rot_matrix_e[2, 1], rot_matrix_e[0, 2], rot_matrix_e[1, 0]])
 
+        # Calculate the desired angular velocity and accelaration
+        x_b = cur_rotation[:,0]
+        y_b = cur_rotation[:,1]
+        z_b = cur_rotation[:,2]
+        x_3d = np.zeros(3) # modify if we ever use a non stationary trajectory
+        x_4d = np.zeros(3) # modify if we ever use a non stationary trajectory
+        dyaw_d = 0
+        ddyaw_d = 0
+        f_dot = drone_m * np.dot(z_b, x_3d)
+        if thrust == 0 : 
+            thrust = thrust + 1e-8
+        h_w = (drone_m / thrust) * (x_3d - (f_dot / drone_m) * z_b)
+        p_omega = -np.dot(h_w, y_b)
+        q_omega = np.dot(h_w, x_b)
+        r_omega = dyaw_d * np.dot(z_b, np.array([0,0,1]))
+        f_ddot = drone_m * np.dot(z_b, x_4d) - thrust * np.dot(z_b, np.cross(cur_angular_vel, np.cross(cur_angular_vel, z_b)))
+        h_alpha = (drone_m / thrust) * (x_4d - (f_ddot/drone_m)*z_b - 2*(f_dot/drone_m)*np.cross(cur_angular_vel,z_b))\
+            - np.cross(cur_angular_vel, np.cross(cur_angular_vel, z_b))
+        p_alpha = -np.dot(h_alpha, x_b)
+        q_alpha = np.dot(h_alpha, y_b)
+        r_alpha = ddyaw_d * np.dot(z_b, np.array([0,0,1]))
+
         # Convert all angular velocity and angular accelaration to the body frame
         cur_angular_vel = cur_rotation.transpose() @ cur_angular_vel
-        target_angular_vel = target_rotation.transpose() @ target_angular_vel
-        target_angular_acc = target_rotation.transpose() @ target_angular_acc
+        target_angular_vel = np.array([p_omega, q_omega, r_omega])
+        target_angular_acc = np.array([p_alpha, q_alpha, r_alpha])
 
         # Calculate the angular velocity error
         omega_e = cur_angular_vel - cur_rotation.transpose()@target_rotation@target_angular_vel
