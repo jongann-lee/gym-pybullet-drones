@@ -144,7 +144,7 @@ def run(
         #### Compute control for the current way point #############
         for j in range(num_drones):
             obs_action = obs[j]
-            action[j, :], _ = ctrl[j].computeControl(drone_m = env.M*1.1, # currently 0.027
+            action[j, :], _ = ctrl[j].computeControl(drone_m = env.M, # currently 0.027
                                                         drone_J = env.J, # currently 1.4, 1.4, 2.17 * e-5
                                                         cur_pos=obs_action[0:3],
                                                         cur_quat=obs_action[3:7],

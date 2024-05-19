@@ -35,7 +35,7 @@ class GeometricControl(BaseControl):
         self.k_x = 5 * 0.01         # optimal value 5 * 0.01
         self.k_v = 4 * 0.01         # optimal value 4 * 0.01
         self.k_R = 5 * 0.01       # optimal value 5 * 0.01
-        self.k_omega = 0.5 * 0.01   # optimal value 0.1 * 0.01
+        self.k_omega = 0.1 * 0.01   # optimal value 0.1 * 0.01
         #print("GeoCon Init")
         self.PWM2RPM_SCALE = 0.2685
         self.PWM2RPM_CONST = 4070.3

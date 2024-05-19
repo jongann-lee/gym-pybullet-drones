@@ -37,7 +37,7 @@ record_video = DEFAULT_RECORD_VIDEO
 colab = DEFAULT_COLAB
 plot = True
 
-filename = os.path.join(output_folder, 'save-05.16.2024_01.33.52')
+filename = os.path.join(output_folder, 'save-05.18.2024_20.23.56')
 
 if os.path.isfile(filename+'/best_model.zip'):
     path = filename+'/best_model.zip'
@@ -46,15 +46,11 @@ else:
 model = TD3.load(path)
 
 #### Show (and record a video of) the model's performance ##
-test_env = GeoHoverAviary(initial_xyzs = np.array([[0,0,1] for i in range(1)]), 
-                        initial_rpys = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
-                        gui=gui,
+test_env = GeoHoverAviary(gui=gui,
                         obs=DEFAULT_OBS,
                         act=DEFAULT_ACT,
                         record=record_video)
-test_env_nogui = GeoHoverAviary(initial_xyzs = np.array([[0,0,1] for i in range(1)]), 
-                                initial_rpys = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
-                                obs=DEFAULT_OBS, act=DEFAULT_ACT)
+test_env_nogui = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
 
 logger = Logger(logging_freq_hz=int(test_env.PYB_FREQ),
             num_drones=1,
@@ -72,8 +68,9 @@ obs, info = test_env.reset(seed=42, options={})
 start = time.time()
 for i in range(test_env.PYB_STEPS_PER_CTRL):
     obs2 = test_env.observation_buffer[i][:]
+    print("Obs:", obs2)
     logger.log(drone=0,
-                timestamp=i/test_env.PYB_FREQ + 0.5,
+                timestamp=i/test_env.PYB_FREQ + 0.1,
                 state=obs2,
                 control=np.zeros(12)
                 )
@@ -84,19 +81,20 @@ for i in range((test_env.EPISODE_LEN_SEC)*test_env.PYB_FREQ):
                                     deterministic=True
                                     )
         obs, reward, terminated, truncated, info = test_env.step(action)
+        #if truncated == True: print("\t Truncated")
         act2 = action.squeeze()
         print("\tAction", action)
         
     
     obs2 = test_env.observation_buffer[i % test_env.PYB_STEPS_PER_CTRL][:]
-    #print("Obs:", obs2)
+    print("Obs:", obs2)
     
     
     #print("Obs:", obs2, "\tReward:", reward, "\tTerminated:", terminated, "\tTruncated:", truncated)
     
     if DEFAULT_OBS == ObservationType.KIN:
         logger.log(drone=0,
-            timestamp=i/test_env.PYB_FREQ + 0.5,
+            timestamp=i/test_env.PYB_FREQ + 0.1,
             state=obs2,
             control=np.zeros(12)
             )

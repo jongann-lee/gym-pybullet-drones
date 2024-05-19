@@ -182,13 +182,13 @@ class BaseGeoRLAviary(BaseAviary):
         if self.ACT_TYPE == ActionType.GEO:
             self.ctrl[0].k_x = 5 * 0.01 #np.power(2, 5 * np.random.rand() + 0.01) * 0.01
             self.ctrl[0].k_v = 4 * 0.01
-            self.ctrl[0].k_R = 5 * np.power(10, 2 * np.random.rand() - 1) * 0.01
-            self.ctrl[0].k_omega = 0.1 * np.power(4, 2 * np.random.rand() - 1) * 0.01
+            self.ctrl[0].k_R = 5 * 0.01 #5 * np.power(10, 2 * np.random.rand() - 1) * 0.01
+            self.ctrl[0].k_omega = 0.1 * 0.01 #0.1 * np.power(4, 2 * np.random.rand() - 1) * 0.01
         p.resetSimulation(physicsClientId=self.CLIENT)
         #### Housekeeping ##########################################
         self._housekeeping()
-        self.pos = np.array([[0,0,1] for i in range(1)])
-        self.rpy = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)])
+        # self.pos = np.array([[0,0,0] for i in range(1)])
+        # self.rpy = np.array([[0, 0, 0] for i in range(1)])
         #### Update and store the drones kinematic information #####
         self._updateAndStoreKinematicInformation()
         #### Start video recording #################################
@@ -433,7 +433,8 @@ class BaseGeoRLAviary(BaseAviary):
                                                         target_angular_vel=np.zeros(3),
                                                         target_angular_acc=np.zeros(3)
                                                         )
-                rpm[k,:] = rpm_k
+                #print(rpm_k)
+                rpm[k,:] = np.clip(rpm_k, 0, self.MAX_RPM)
             elif self.ACT_TYPE == ActionType.VEL:
                 state = self._getDroneStateVector(k)
                 if np.linalg.norm(target[0:3]) != 0:
@@ -568,7 +569,7 @@ class BaseGeoRLAviary(BaseAviary):
                 #np.hstack([np.linalg.norm(e_x), np.linalg.norm(e_v), np.linalg.norm(e_R), np.linalg.norm(e_omega)])
                 self.norm_error_buffer.append(norm_error)
 
-            #return np.ones((6,4))
+            #return np.ones((12,2))
             return np.asarray(self.norm_error_buffer)
 
         else:

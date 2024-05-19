@@ -84,16 +84,13 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     if not os.path.exists(filename):
         os.makedirs(filename+'/')
 
+    # train_env = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
     train_env = make_vec_env(GeoHoverAviary,
-                             env_kwargs=dict(initial_xyzs = np.array([[0,0,1] for i in range(1)]), 
-                                            initial_rpys = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
-                                            obs=DEFAULT_OBS, act=DEFAULT_ACT),
+                             env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT),
                              n_envs=1,
                              seed=0
                              )
-    eval_env = GeoHoverAviary(initial_xyzs = np.array([[0,0,1] for i in range(1)]), 
-                                            initial_rpys = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
-                                            obs=DEFAULT_OBS, act=DEFAULT_ACT)
+    eval_env = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
 
     #### Check the environment's spaces ########################
     print('[INFO] Action space:', train_env.action_space)
@@ -119,10 +116,10 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                 policy_kwargs = offpolicy_kwargs,
                 buffer_size= 200000,
                 learning_starts= 1000,
-                learning_rate = 0.001, 
+                learning_rate = 0.00001, 
                 action_noise=actionnoise,
                 batch_size = 256,
-                gradient_steps= -1,
+                gradient_steps= 1,
                 # tensorboard_log=filename+'/tb/',
                 verbose=1)
     
@@ -138,7 +135,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     if DEFAULT_ACT == ActionType.ONE_D_RPM:
         target_reward = 474.15 
     else:
-        target_reward = 46700. 
+        target_reward = 2000. 
     callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=target_reward,
                                                      verbose=1)
     
@@ -150,7 +147,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                                  eval_freq=int(1000),
                                  deterministic=True,
                                  render=False)
-    model.learn(total_timesteps=int(2e6) if local else int(1e2), # shorter training in GitHub Actions pytest
+    model.learn(total_timesteps=int(1e6) if local else int(1e2), # shorter training in GitHub Actions pytest
                 callback=eval_callback,
                 log_interval=100)
 
@@ -182,15 +179,11 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     model = TD3.load(path)
 
     #### Show (and record a video of) the model's performance ##
-    test_env = GeoHoverAviary(initial_xyzs = np.array([[0,0,1] for i in range(1)]), 
-                            initial_rpys = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
-                            gui=gui,
+    test_env = GeoHoverAviary(gui=gui,
                             obs=DEFAULT_OBS,
                             act=DEFAULT_ACT,
                             record=record_video)
-    test_env_nogui = GeoHoverAviary(initial_xyzs = np.array([[0,0,1] for i in range(1)]), 
-                                    initial_rpys = np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
-                                    obs=DEFAULT_OBS, act=DEFAULT_ACT)
+    test_env_nogui = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
 
     logger = Logger(logging_freq_hz=int(test_env.CTRL_FREQ),
                 num_drones=1,

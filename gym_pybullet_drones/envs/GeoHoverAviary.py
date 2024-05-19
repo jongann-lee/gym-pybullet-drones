@@ -10,11 +10,11 @@ class GeoHoverAviary(BaseGeoRLAviary):
     
     def __init__(self,
                  drone_model: DroneModel=DroneModel.CF2X,
-                 initial_xyzs=None,
-                 initial_rpys=None,
+                 initial_xyzs=np.array([[0,0,1] for i in range(1)]),
+                 initial_rpys=np.array([[np.pi/3, np.pi/3, 0] for i in range(1)]),
                  physics: Physics=Physics.PYB,
-                 pyb_freq: int = 240,
-                 update_freq: int = 24,
+                 pyb_freq: int = 120,
+                 update_freq: int = 10,
                  gui=False,
                  record=False,
                  obs: ObservationType=ObservationType.KIN,
@@ -36,8 +36,8 @@ class GeoHoverAviary(BaseGeoRLAviary):
             The desired implementation of PyBullet physics/custom dynamics.
         pyb_freq : int, optional
             The frequency at which PyBullet steps (a multiple of ctrl_freq).
-        ctrl_freq : int, optional
-            The frequency at which the environment steps.
+        update_freq : int, optional
+            The frequency at which the environment steps (and updates the controller parameters).
         gui : bool, optional
             Whether to use PyBullet's GUI.
         record : bool, optional
@@ -81,7 +81,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
         rot_e = error[6]
         omega_e = error[7:10]
         
-        ret = (2 - rot_e) + (0.5 * time_elapsed) * (1 - np.linalg.norm(omega_e))
+        ret = (2 - rot_e)# + (0.5 * time_elapsed) * (1 - np.linalg.norm(omega_e))
         return ret
 
     ################################################################################
@@ -113,8 +113,8 @@ class GeoHoverAviary(BaseGeoRLAviary):
 
         """
         state = self._getDroneStateVector(0)
-        if (abs(state[0]) > 2 or abs(state[1]) > 2 or state[2] > 3  # Truncate when the drone is too far away
-             or abs(state[7]) > 2.4 or abs(state[8]) > 2.4 # Truncate when the drone is too tilted
+        if (abs(state[0]) > 2 or abs(state[1]) > 2 or state[2] > 3  # Truncate when the drone is too far away or when it hits the ground
+             # Truncate when the drone is too tilted or state[2] < 0.001
         ):
             return True
         if self.step_counter/self.PYB_FREQ > self.EPISODE_LEN_SEC:
