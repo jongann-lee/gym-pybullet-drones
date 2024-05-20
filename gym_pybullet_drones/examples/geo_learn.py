@@ -116,7 +116,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                 policy_kwargs = offpolicy_kwargs,
                 buffer_size= 200000,
                 learning_starts= 1000,
-                learning_rate = 0.00001, 
+                learning_rate = 0.001, 
                 action_noise=actionnoise,
                 batch_size = 256,
                 gradient_steps= 1,
@@ -124,7 +124,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                 verbose=1)
     
     #### Optional: load a previous model
-    #load_name = os.path.join(output_folder, 'save-05.11.2024_21.33.47/best_model.zip') # save-05.06.2024_02.09.37
+    #load_name = os.path.join(output_folder, 'save-05.19.2024_14.28.19/best_model.zip') # save-05.06.2024_02.09.37
     #model = TD3.load(load_name)
     #model.set_parameters(load_path_or_dict=load_name)
     #model.set_env(train_env)
@@ -144,10 +144,10 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                                  verbose=1,
                                  best_model_save_path=filename+'/',
                                  log_path=filename+'/',
-                                 eval_freq=int(1000),
+                                 eval_freq=int(2000),
                                  deterministic=True,
                                  render=False)
-    model.learn(total_timesteps=int(1e6) if local else int(1e2), # shorter training in GitHub Actions pytest
+    model.learn(total_timesteps=int(2e5) if local else int(1e2), # shorter training in GitHub Actions pytest
                 callback=eval_callback,
                 log_interval=100)
 

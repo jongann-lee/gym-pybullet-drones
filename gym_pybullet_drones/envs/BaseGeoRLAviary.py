@@ -80,7 +80,7 @@ class BaseGeoRLAviary(BaseAviary):
         self.NORM_ERROR_BUFFER_SIZE = int(pyb_freq / (update_freq))
         self.norm_error_buffer = deque(maxlen = self.NORM_ERROR_BUFFER_SIZE)
         for _ in range(self.NORM_ERROR_BUFFER_SIZE):
-            self.norm_error_buffer.append(np.zeros(2))
+            self.norm_error_buffer.append(np.zeros(1))
 
         ####
         vision_attributes = True if obs == ObservationType.RGB else False
@@ -511,8 +511,8 @@ class BaseGeoRLAviary(BaseAviary):
             """
             lo = 0 #-np.inf
             hi = np.inf
-            obs_lower_bound = np.array([[0, lo] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
-            obs_upper_bound = np.array([[2, hi] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
+            obs_lower_bound = np.array([[0] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
+            obs_upper_bound = np.array([[2] for i in range(self.NORM_ERROR_BUFFER_SIZE)])
             return spaces.Box(low=obs_lower_bound, high=obs_upper_bound, dtype=np.float32)
         else:
             print("[ERROR] in BaseRLAviary._observationSpace()")
@@ -565,12 +565,12 @@ class BaseGeoRLAviary(BaseAviary):
                 e_R = self.error_buffer[i][6]
                 e_omega = self.error_buffer[i][7:10]
 
-                norm_error = np.hstack([e_R, np.linalg.norm(e_omega)])
+                norm_error = e_R#np.hstack([e_R, np.linalg.norm(e_omega)])
                 #np.hstack([np.linalg.norm(e_x), np.linalg.norm(e_v), np.linalg.norm(e_R), np.linalg.norm(e_omega)])
                 self.norm_error_buffer.append(norm_error)
 
             #return np.ones((12,2))
-            return np.asarray(self.norm_error_buffer)
+            return np.asarray(np.reshape(self.norm_error_buffer, (12,1)))
 
         else:
             print("[ERROR] in BaseRLAviary._computeObs()")

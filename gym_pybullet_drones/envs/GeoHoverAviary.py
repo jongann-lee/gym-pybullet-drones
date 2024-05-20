@@ -81,7 +81,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
         rot_e = error[6]
         omega_e = error[7:10]
         
-        ret = (2 - rot_e)# + (0.5 * time_elapsed) * (1 - np.linalg.norm(omega_e))
+        ret = (1/24)*(2 - rot_e)# + (0.5 * time_elapsed) * (1 - np.linalg.norm(omega_e))
         return ret
 
     ################################################################################

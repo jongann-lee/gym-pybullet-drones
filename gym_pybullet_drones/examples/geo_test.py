@@ -37,13 +37,14 @@ record_video = DEFAULT_RECORD_VIDEO
 colab = DEFAULT_COLAB
 plot = True
 
-filename = os.path.join(output_folder, 'save-05.18.2024_20.23.56')
+filename = os.path.join(output_folder, 'save-05.20.2024_00.38.56')
 
 if os.path.isfile(filename+'/best_model.zip'):
     path = filename+'/best_model.zip'
+    path_2 = filename + '/final_model.zip'
 else:
     print("[ERROR]: no model under the specified path", filename)
-model = TD3.load(path)
+model = TD3.load(path_2)
 
 #### Show (and record a video of) the model's performance ##
 test_env = GeoHoverAviary(gui=gui,
@@ -68,13 +69,13 @@ obs, info = test_env.reset(seed=42, options={})
 start = time.time()
 for i in range(test_env.PYB_STEPS_PER_CTRL):
     obs2 = test_env.observation_buffer[i][:]
-    print("Obs:", obs2)
+    #print("Obs:", obs2)
     logger.log(drone=0,
                 timestamp=i/test_env.PYB_FREQ + 0.1,
                 state=obs2,
                 control=np.zeros(12)
                 )
-
+print(obs)
 for i in range((test_env.EPISODE_LEN_SEC)*test_env.PYB_FREQ):
     if (i % test_env.PYB_STEPS_PER_CTRL) == 0:
         action, _states = model.predict(obs,
@@ -87,7 +88,7 @@ for i in range((test_env.EPISODE_LEN_SEC)*test_env.PYB_FREQ):
         
     
     obs2 = test_env.observation_buffer[i % test_env.PYB_STEPS_PER_CTRL][:]
-    print("Obs:", obs2)
+    #print("Obs:", obs2)
     
     
     #print("Obs:", obs2, "\tReward:", reward, "\tTerminated:", terminated, "\tTruncated:", truncated)
