@@ -54,6 +54,7 @@ test_vec_env = make_vec_env(GeoHoverAviary,
                              seed=0
                              )
 test_vec_env = VecNormalize.load(filename + "/norm_param.pkl", test_vec_env)
+test_vec_env.training = False
 test_env = test_vec_env.envs[0]
 test_env_nogui = make_vec_env(GeoHoverAviary,
                             env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT),
@@ -61,6 +62,7 @@ test_env_nogui = make_vec_env(GeoHoverAviary,
                             seed=0
                             )
 test_env_nogui = VecNormalize.load(filename + "/norm_param.pkl", test_env_nogui)
+test_env_nogui.training = False
 
 logger = Logger(logging_freq_hz=int(test_env.PYB_FREQ),
             num_drones=1,
