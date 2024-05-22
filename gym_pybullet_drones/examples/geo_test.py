@@ -11,6 +11,7 @@ import numpy as np
 import torch
 from stable_baselines3 import PPO, A2C, TD3
 from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.evaluation import evaluate_policy
 
@@ -37,21 +38,29 @@ record_video = DEFAULT_RECORD_VIDEO
 colab = DEFAULT_COLAB
 plot = True
 
-filename = os.path.join(output_folder, 'save-05.20.2024_00.38.56')
+filename = os.path.join(output_folder, 'save-05.22.2024_15.50.06')
 
 if os.path.isfile(filename+'/best_model.zip'):
     path = filename+'/best_model.zip'
     path_2 = filename + '/final_model.zip'
 else:
     print("[ERROR]: no model under the specified path", filename)
-model = TD3.load(path_2)
+model = TD3.load(path)
 
 #### Show (and record a video of) the model's performance ##
-test_env = GeoHoverAviary(gui=gui,
-                        obs=DEFAULT_OBS,
-                        act=DEFAULT_ACT,
-                        record=record_video)
-test_env_nogui = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+test_vec_env = make_vec_env(GeoHoverAviary,
+                             env_kwargs=dict(gui=gui, obs=DEFAULT_OBS, act=DEFAULT_ACT, record = record_video),
+                             n_envs=1,
+                             seed=0
+                             )
+test_vec_env = VecNormalize.load(filename + "/norm_param.pkl", test_vec_env)
+test_env = test_vec_env.envs[0]
+test_env_nogui = make_vec_env(GeoHoverAviary,
+                            env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT),
+                            n_envs=1,
+                            seed=0
+                            )
+test_env_nogui = VecNormalize.load(filename + "/norm_param.pkl", test_env_nogui)
 
 logger = Logger(logging_freq_hz=int(test_env.PYB_FREQ),
             num_drones=1,
@@ -65,7 +74,7 @@ mean_reward, std_reward = evaluate_policy(model,
                                             )
 print("\n\n\nMean reward ", mean_reward, " +- ", std_reward, "\n\n")
 
-obs, info = test_env.reset(seed=42, options={})
+obs = test_vec_env.reset()
 start = time.time()
 for i in range(test_env.PYB_STEPS_PER_CTRL):
     obs2 = test_env.observation_buffer[i][:]
@@ -75,13 +84,13 @@ for i in range(test_env.PYB_STEPS_PER_CTRL):
                 state=obs2,
                 control=np.zeros(12)
                 )
-print(obs)
+#print(obs)
 for i in range((test_env.EPISODE_LEN_SEC)*test_env.PYB_FREQ):
     if (i % test_env.PYB_STEPS_PER_CTRL) == 0:
         action, _states = model.predict(obs,
                                     deterministic=True
                                     )
-        obs, reward, terminated, truncated, info = test_env.step(action)
+        obs, reward, dones, info = test_vec_env.step(action)
         #if truncated == True: print("\t Truncated")
         act2 = action.squeeze()
         print("\tAction", action)
@@ -103,8 +112,8 @@ for i in range((test_env.EPISODE_LEN_SEC)*test_env.PYB_FREQ):
     #test_env.render()
     #print(terminated)
     sync(i, start, test_env.PYB_TIMESTEP)
-    if terminated:
-        obs = test_env.reset(seed=42, options={})
+    if dones:
+        obs = test_vec_env.reset()
 test_env.close()
 
 if plot and DEFAULT_OBS == ObservationType.KIN:

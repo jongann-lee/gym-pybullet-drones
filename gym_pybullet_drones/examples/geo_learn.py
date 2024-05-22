@@ -25,6 +25,7 @@ import torch
 from stable_baselines3 import PPO, A2C, DDPG, TD3
 from stable_baselines3.common.noise import NormalActionNoise
 from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -90,7 +91,13 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                              n_envs=1,
                              seed=0
                              )
-    eval_env = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+    train_norm_env = VecNormalize(train_env, norm_obs= True, norm_reward= True)
+    eval_env = make_vec_env(GeoHoverAviary,
+                             env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT),
+                             n_envs=1,
+                             seed=0
+                             )
+    eval_norm_env = VecNormalize(eval_env, norm_obs= True, norm_reward= True, training=False)
 
     #### Check the environment's spaces ########################
     print('[INFO] Action space:', train_env.action_space)
@@ -109,24 +116,25 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     features_extractor_kwargs=dict(features_dim=32),
     )
     n_actions = train_env.action_space.shape[-1]
-    actionnoise = NormalActionNoise(mean=np.zeros(n_actions), sigma = 0.5*np.ones(n_actions))
+    actionnoise = NormalActionNoise(mean=np.zeros(n_actions), sigma = 0.1*np.ones(n_actions))
 
     model = TD3('MlpPolicy',
                 train_env,
                 policy_kwargs = offpolicy_kwargs,
                 buffer_size= 200000,
                 learning_starts= 1000,
-                learning_rate = 0.001, 
+                learning_rate = 1e-5, 
                 action_noise=actionnoise,
                 batch_size = 256,
                 gradient_steps= 1,
+                tau = 0.001,
                 # tensorboard_log=filename+'/tb/',
                 verbose=1)
     
     #### Optional: load a previous model
-    #load_name = os.path.join(output_folder, 'save-05.19.2024_14.28.19/best_model.zip') # save-05.06.2024_02.09.37
+    load_name = os.path.join(output_folder, 'save-05.20.2024_00.38.56/best_model.zip') # save-05.06.2024_02.09.37
     #model = TD3.load(load_name)
-    #model.set_parameters(load_path_or_dict=load_name)
+    model.set_parameters(load_path_or_dict=load_name)
     #model.set_env(train_env)
     #model.action_noise = actionnoise
     #model.learning_rate = 0.00005
@@ -144,7 +152,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                                  verbose=1,
                                  best_model_save_path=filename+'/',
                                  log_path=filename+'/',
-                                 eval_freq=int(2000),
+                                 eval_freq=int(1000),
                                  deterministic=True,
                                  render=False)
     model.learn(total_timesteps=int(2e5) if local else int(1e2), # shorter training in GitHub Actions pytest
@@ -155,6 +163,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     #### Save the model ########################################
     model.save(filename+'/final_model.zip')
     print(filename)
+    train_norm_env.save(filename + '/norm_param.pkl')
 
     #### Print training progression ############################
     with np.load(filename+'/evaluations.npz') as data:
@@ -179,11 +188,19 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     model = TD3.load(path)
 
     #### Show (and record a video of) the model's performance ##
-    test_env = GeoHoverAviary(gui=gui,
-                            obs=DEFAULT_OBS,
-                            act=DEFAULT_ACT,
-                            record=record_video)
-    test_env_nogui = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+    test_vec_env = make_vec_env(GeoHoverAviary,
+                             env_kwargs=dict(gui=gui, obs=DEFAULT_OBS, act=DEFAULT_ACT, record = record_video),
+                             n_envs=1,
+                             seed=0
+                             )
+    test_vec_env = VecNormalize.load(filename + "/norm_param.pkl", test_vec_env)
+    test_env = test_vec_env.envs[0]
+    test_env_nogui = make_vec_env(GeoHoverAviary,
+                             env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT),
+                             n_envs=1,
+                             seed=0
+                             )
+    test_env_nogui = VecNormalize.load(filename + "/norm_param.pkl", test_env_nogui)
 
     logger = Logger(logging_freq_hz=int(test_env.CTRL_FREQ),
                 num_drones=1,
@@ -197,7 +214,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                                               )
     print("\n\n\nMean reward ", mean_reward, " +- ", std_reward, "\n\n")
 
-    obs, info = test_env.reset(seed=42, options={})
+    obs = test_vec_env.reset()
     start = time.time()
     ctrl = GeometricControl(drone_model = DEFAULT_DRONEMODEL)
 
@@ -206,7 +223,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
             action, _states = model.predict(obs,
                                         deterministic=True
                                         )
-            obs, reward, terminated, truncated, info = test_env.step(action)
+            obs, reward, dones, info = test_vec_env.step(action)
             act2 = action.squeeze()
             print("\tAction", action)
         
@@ -226,9 +243,9 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
         #test_env.render()
         #print(terminated)
         sync(i, start, test_env.PYB_TIMESTEP)
-        if terminated:
-            obs = test_env.reset(seed=42, options={})
-    test_env.close()
+        if dones:
+            obs = test_vec_env.reset()
+    test_vec_env.close()
 
     if plot and DEFAULT_OBS == ObservationType.KIN:
         logger.plot()

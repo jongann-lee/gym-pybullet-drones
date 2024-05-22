@@ -49,7 +49,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
 
         """
         self.TARGET_POS = np.array([0,0,1])
-        self.EPISODE_LEN_SEC = 4
+        self.EPISODE_LEN_SEC = 2
         super().__init__(drone_model=drone_model,
                          num_drones=1,
                          initial_xyzs=initial_xyzs,
@@ -76,13 +76,14 @@ class GeoHoverAviary(BaseGeoRLAviary):
         """
         obs = self._getDroneStateVector(0)
         time_elapsed = int(self.step_counter/self.PYB_FREQ)  # elapsed time in seconds 
-
         error = self.error_buffer[-1][:]
+        pos_e = error[0:3]
         rot_e = error[6]
         omega_e = error[7:10]
         
-        ret = (1/24)*(2 - rot_e)# + (0.5 * time_elapsed) * (1 - np.linalg.norm(omega_e))
-        return ret
+        reward_angle = (1/24)*(2 - rot_e)# + (0.5 * time_elapsed) * (1 - np.linalg.norm(omega_e))
+        reward_position = (1/12) * (1 - np.linalg.norm(pos_e)**2)
+        return reward_position
 
     ################################################################################
     
