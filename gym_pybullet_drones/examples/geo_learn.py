@@ -97,7 +97,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                              n_envs=1,
                              seed=0
                              )
-    eval_norm_env = VecNormalize(eval_env, norm_obs= True, norm_reward= True, training=False)
+    eval_norm_env = VecNormalize(eval_env, norm_obs= True, norm_reward= False, training=False)
 
     #### Check the environment's spaces ########################
     print('[INFO] Action space:', train_env.action_space)
@@ -119,9 +119,9 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     actionnoise = NormalActionNoise(mean=np.zeros(n_actions), sigma = 0.1*np.ones(n_actions))
 
     model = TD3('MlpPolicy',
-                train_env,
+                train_norm_env,
                 policy_kwargs = offpolicy_kwargs,
-                buffer_size= 200000,
+                buffer_size= 1000000,
                 learning_starts= 1000,
                 learning_rate = 1e-5, 
                 action_noise=actionnoise,
@@ -147,7 +147,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
     callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=target_reward,
                                                      verbose=1)
     
-    eval_callback = EvalCallback(eval_env,
+    eval_callback = EvalCallback(eval_norm_env,
                                  callback_on_new_best=callback_on_best,
                                  verbose=1,
                                  best_model_save_path=filename+'/',

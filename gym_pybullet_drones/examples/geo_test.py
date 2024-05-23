@@ -38,14 +38,14 @@ record_video = DEFAULT_RECORD_VIDEO
 colab = DEFAULT_COLAB
 plot = True
 
-filename = os.path.join(output_folder, 'save-05.22.2024_15.50.06')
+filename = os.path.join(output_folder, 'save-05.23.2024_10.31.15')
 
 if os.path.isfile(filename+'/best_model.zip'):
     path = filename+'/best_model.zip'
     path_2 = filename + '/final_model.zip'
 else:
     print("[ERROR]: no model under the specified path", filename)
-model = TD3.load(path)
+model = TD3.load(path_2)
 
 #### Show (and record a video of) the model's performance ##
 test_vec_env = make_vec_env(GeoHoverAviary,
@@ -55,6 +55,7 @@ test_vec_env = make_vec_env(GeoHoverAviary,
                              )
 test_vec_env = VecNormalize.load(filename + "/norm_param.pkl", test_vec_env)
 test_vec_env.training = False
+test_vec_env.norm_reward = False
 test_env = test_vec_env.envs[0]
 test_env_nogui = make_vec_env(GeoHoverAviary,
                             env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT),
@@ -63,6 +64,7 @@ test_env_nogui = make_vec_env(GeoHoverAviary,
                             )
 test_env_nogui = VecNormalize.load(filename + "/norm_param.pkl", test_env_nogui)
 test_env_nogui.training = False
+test_env_nogui.norm_reward = False
 
 logger = Logger(logging_freq_hz=int(test_env.PYB_FREQ),
             num_drones=1,
