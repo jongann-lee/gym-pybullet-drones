@@ -311,7 +311,7 @@ class BaseGeoRLAviary(BaseAviary):
                 self.error_buffer.append(current_error)
 
                 #Caculate the reward
-                reward += self._computeReward()
+                reward += self._computeReward(action)
 
             #### PyBullet computes the new state, unless Physics.DYN ###
             if self.PHYSICS != Physics.DYN:

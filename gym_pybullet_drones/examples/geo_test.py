@@ -38,14 +38,14 @@ record_video = DEFAULT_RECORD_VIDEO
 colab = DEFAULT_COLAB
 plot = True
 
-filename = os.path.join(output_folder, 'save-05.23.2024_10.31.15')
+filename = os.path.join(output_folder, 'save-05.24.2024_22.23.19')
 
 if os.path.isfile(filename+'/best_model.zip'):
     path = filename+'/best_model.zip'
     path_2 = filename + '/final_model.zip'
 else:
     print("[ERROR]: no model under the specified path", filename)
-model = TD3.load(path_2)
+model = TD3.load(path)
 
 #### Show (and record a video of) the model's performance ##
 test_vec_env = make_vec_env(GeoHoverAviary,

@@ -65,7 +65,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
 
     ################################################################################
     
-    def _computeReward(self):
+    def _computeReward(self, action):
         """Computes the current reward value.
 
         Returns
@@ -82,7 +82,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
         omega_e = error[7:10]
         
         reward_angle = (1/24)*(2 - rot_e)# + (0.5 * time_elapsed) * (1 - np.linalg.norm(omega_e))
-        reward_position = (1/12) * (1 - np.linalg.norm(pos_e)**2)
+        reward_position = (1/12) * (1 - np.linalg.norm(pos_e)**2) - (time_elapsed/24) * (np.abs(action[0,0]) + np.abs(action[0,1]))
         return reward_position
 
     ################################################################################
