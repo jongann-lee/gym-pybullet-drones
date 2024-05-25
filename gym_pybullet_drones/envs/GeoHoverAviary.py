@@ -17,6 +17,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
                  update_freq: int = 10,
                  gui=False,
                  record=False,
+                 train = False,
                  obs: ObservationType=ObservationType.KIN,
                  act: ActionType=ActionType.RPM
                  ):
@@ -59,6 +60,7 @@ class GeoHoverAviary(BaseGeoRLAviary):
                          update_freq=update_freq,
                          gui=gui,
                          record=record,
+                         train = train,
                          obs=obs,
                          act=act
                          )

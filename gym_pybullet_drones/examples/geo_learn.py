@@ -125,7 +125,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
 
     # train_env = GeoHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
     train_env = make_vec_env(GeoHoverAviary,
-                             env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT),
+                             env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT, train=True),
                              n_envs=1,
                              seed=0
                              )
@@ -137,10 +137,10 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                              )
     eval_norm_env = VecNormalize(eval_env, norm_obs= True, norm_reward= False, training=False)
 
-    train_norm_env = VecNormalize.load(output_folder + "/save-05.24.2024_22.23.19/norm_param.pkl",train_norm_env)
-    eval_norm_env = VecNormalize.load(output_folder + "/save-05.24.2024_22.23.19/norm_param.pkl",eval_norm_env)
-    eval_norm_env.training = False
-    eval_norm_env.norm_reward = False
+    # train_norm_env = VecNormalize.load(output_folder + "/save-05.24.2024_22.23.19/norm_param.pkl",train_norm_env)
+    # eval_norm_env = VecNormalize.load(output_folder + "/save-05.24.2024_22.23.19/norm_param.pkl",eval_norm_env)
+    # eval_norm_env.training = False
+    # eval_norm_env.norm_reward = False
 
     #### Check the environment's spaces ########################
     print('[INFO] Action space:', train_env.action_space)
@@ -174,9 +174,9 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                 verbose=1)
     
     #### Optional: load a previous model
-    load_name = os.path.join(output_folder, 'save-05.24.2024_22.23.19/best_model.zip') # save-05.06.2024_02.09.37
+    #load_name = os.path.join(output_folder, 'save-05.24.2024_22.23.19/best_model.zip') # save-05.06.2024_02.09.37
     #model = TD3.load(load_name)
-    model.set_parameters(load_path_or_dict=load_name)
+    #model.set_parameters(load_path_or_dict=load_name)
     #model.set_env(train_env)
     #model.action_noise = actionnoise
     #model.learning_rate = 0.00005
@@ -197,7 +197,7 @@ def run( output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=
                                  eval_freq=int(1000),
                                  deterministic=True,
                                  render=False)
-    model.learn(total_timesteps=int(2e3) if local else int(1e2), # shorter training in GitHub Actions pytest
+    model.learn(total_timesteps=int(5e5) if local else int(1e2), # shorter training in GitHub Actions pytest
                 callback=eval_callback,
                 log_interval=100)
 

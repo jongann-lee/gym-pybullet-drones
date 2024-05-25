@@ -38,7 +38,7 @@ record_video = DEFAULT_RECORD_VIDEO
 colab = DEFAULT_COLAB
 plot = True
 
-filename = os.path.join(output_folder, 'save-05.24.2024_22.23.19')
+filename = os.path.join(output_folder, 'save-05.25.2024_09.39.46')
 
 if os.path.isfile(filename+'/best_model.zip'):
     path = filename+'/best_model.zip'
