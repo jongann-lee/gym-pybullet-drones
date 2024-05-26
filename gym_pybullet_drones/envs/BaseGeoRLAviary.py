@@ -190,7 +190,7 @@ class BaseGeoRLAviary(BaseAviary):
             else:
                 self.ctrl[0].k_x = 5 * 0.01 #np.power(2, 5 * np.random.rand() + 0.01) * 0.01
                 self.ctrl[0].k_v = 4 * 0.01
-                self.ctrl[0].k_R = 5 * 0.01 #5 * np.power(10, 2 * np.random.rand() - 1) * 0.01
+                self.ctrl[0].k_R = 50 * 0.01 #5 * np.power(10, 2 * np.random.rand() - 1) * 0.01
                 self.ctrl[0].k_omega = 0.5 * 0.01 #0.1 * np.power(4, 2 * np.random.rand() - 1) * 0.01
         p.resetSimulation(physicsClientId=self.CLIENT)
         #### Housekeeping ##########################################
