@@ -1,3 +1,47 @@
+# Reinforcement Learning based Tuner for the Geometric Tracking Attitude Controller for the Quadrotor
+
+This is the github repository containing the code used to create the reinforcement learning(RL) tuner for the geometric tracking attitude controller for the quadrotor. It is a fork of the [gym-pybullet-drones](https://github.com/utiasDSL/gym-pybullet-drones) repository, which is a pybullet based drone simulation that is compatible with gymnasium. As this is a fork, the README for gym-pybullet-drones has been kept underneath this one. For installation, refer to the gym-pybullet-drones README, as the installation instructions are the same.
+
+## Code Structure
+
+When entering the 'gym-pybullet-drones folder', you will see 5 folders: assets, control, envs, examples, and utils. The asset folder contains various images and configuration data needed for the simulation, including the simulated drone physical parameters which are saved as 'cf2x.urdf'. The utils folder was not used for this development process.
+
+**Control**
+
+This is the folder where the controller is implemented. 'BaseControl.py' defines the base class for the controller and all other controllers are derived from this class. For this project the geometric tracking controller for the quadrotor by Taeyoung Lee was implmented in 'GeometricControl.py'. 
+
+**Envs**
+
+All of the gymnasium environments are contained here. The base environemnt 'BaseAviary.py' is the base class for all subsequent environments (called aviary). The non-RL environment 'ctrl-aviary' is used to control the quadrotor using conventional controllers without RL. 
+
+The RL environments are stacked in the following manner. 
+
+The first layer on top of the 'BaseAviary.py' is the 'BaseRLAviary.py', which we modified to 'BaseGeoRLAviary.py'. This layer implements reset and the step function, both of which form the backbone of the RL environment. It also contains the observation and action space definitions as well as the functions computing the action and observation. 
+
+The layer on top of that is the 'HoverAviary.py', which for our needs has been modified to 'GeoHoverAviary.py'. As the name suggests, the goal of this environment is to make the vehicle hover around a certain point. Crucially, the reward is defined in this file, as well as the functions defining the trunucated and terminated conditions.
+
+**examples**
+
+The final executable python scripts are contained here. The script for testing the vanilla geometric trackig controller is in 'geometric.py'. The script for training the tuner is 'geo_learn.py', and the script for testing the tuned controller is 'geo_test.py'
+
+## Running and testing the RL tuner.
+
+To train the RL tuner run the following code.
+```
+cd gym-pybullet-drones/examples/
+python3 geo_learn.py
+```
+After the training is complete, two files should be saved to the output folder. Both are labelled using the date and time of its creation, with one being the trained RL policy and the other being the normalized environment parameters. Both are necesarry for running the policy on a new agent.
+
+To test the RL tuner, run the following code.
+```
+python3 geo_test.py
+```
+Remember to change the filename in the 'geo_test.py' code to test the correct variant of the RL tuner.
+
+
+
+
 # gym-pybullet-drones
 
 This is a minimalist refactoring of the original `gym-pybullet-drones` repository, designed for compatibility with [`gymnasium`](https://github.com/Farama-Foundation/Gymnasium), [`stable-baselines3` 2.0](https://github.com/DLR-RM/stable-baselines3/pull/1327), and SITL [`betaflight`](https://github.com/betaflight/betaflight)/[`crazyflie-firmware`](https://github.com/bitcraze/crazyflie-firmware/).
